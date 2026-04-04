@@ -86,12 +86,46 @@ KEY_COL1        EQU     12
 KEY_COL2        EQU     13
 KEY_COL3        EQU     14
 KEY_COL4        EQU     15
+; ========================= KEYPAD KEY CODES =========================
+; Assigned left-to-right, top-to-bottom matching physical layout
+; Row 0: 1 2 3 A
+; Row 1: 4 5 6 B
+; Row 2: 7 8 9 C
+; Row 3: * 0 # D
 
+KEY_NONE    EQU     0       ; no key pressed
+
+KEY_1       EQU     1
+KEY_2       EQU     2
+KEY_3       EQU     3
+KEY_A       EQU     4
+
+KEY_4       EQU     5
+KEY_5       EQU     6
+KEY_6       EQU     7
+KEY_B       EQU     8
+
+KEY_7       EQU     9
+KEY_8       EQU     10
+KEY_9       EQU     11
+KEY_C       EQU     12
+
+KEY_STAR    EQU     13
+KEY_0       EQU     14
+KEY_HASH    EQU     15
+KEY_D       EQU     16
+; ========================= SYSTEM FLAGS Masks=========================
+Smoke_Alert_Flag    EQU     1
+Med_Alert_Flag      EQU     2
 ; ========================= SYSTEM STATES =========================
-STATE_MAIN_MENU EQU     0
-STATE_SANITIZING EQU    1
-STATE_HEART_RATE EQU    2
-STATE_BREATHING  EQU    3
-STATE_MED_TIMER  EQU    4
-
+STATE_MAIN_MENU     EQU    0
+STATE_SANITIZING    EQU    1
+STATE_HEART_RATE    EQU    2
+STATE_BREATHING     EQU    3
+STATE_MOTION        EQU    5
+STATE_MED_ALERT     EQU    4
+STATE_MED_INPUT     EQU    6
+STATE_MED_DISPENSE  EQU    7
+STATE_SMOKE_ALERT   EQU    8
+STATE_MED_WAITING   EQU     9
         END
