@@ -2,23 +2,10 @@
 ; FILE: tft_gfx.s
 ; DESCRIPTION:
 ;   High-level graphics and UI rendering layer for the TFT.
-;
-; THIS FILE IS RESPONSIBLE FOR:
-;   1) Clear screen
-;   2) Draw pixel
-;   3) Fill rectangle
-;   4) Draw rectangle border
-;   5) Draw character
-;   6) Draw string
-;   7) Implement exact UI render function names required by ui_state.s
-;   8) Implement smoke level partial update
-;
-; IMPORTANT RULE:
-;   This file does NOT touch TFT pins directly.
-;   It only uses the low-level API from tft_low.s.
 ; =====================================================================
 
         AREA    TFT_GFX, CODE, READONLY
+        THUMB
 
         EXPORT  TFT_Clear_Screen
         EXPORT  TFT_Render_Main_Menu
@@ -72,20 +59,25 @@ SMOKE_INNER_H       EQU     16
 ;   R0 = number of pixels to write
 ;   R1 = RGB565 color
 ; =====================================================================
-TFT_Fill_Window_Color:
+TFT_Fill_Window_Color
         PUSH    {R4,R5,LR}
         MOV     R4, R0
         MOV     R5, R1
-TFT_Fill_Window_Color_Loop:
+
+TFT_Fill_Window_Color_Loop
         CMP     R4, #0
         BEQ     TFT_Fill_Window_Color_Done
+
         MOV     R0, R5
         BL      TFT_WriteData16
+
         SUBS    R4, R4, #1
         B       TFT_Fill_Window_Color_Loop
-TFT_Fill_Window_Color_Done:
+
+TFT_Fill_Window_Color_Done
         POP     {R4,R5,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Draw_Pixel
@@ -96,16 +88,20 @@ TFT_Fill_Window_Color_Done:
 ;   R1 = y
 ;   R2 = color
 ; =====================================================================
-TFT_Draw_Pixel:
+TFT_Draw_Pixel
         PUSH    {R4,LR}
+
         MOV     R4, R2
         MOV     R2, R0
         MOV     R3, R1
         BL      TFT_SetAddressWindow
+
         MOV     R0, R4
         BL      TFT_WriteData16
+
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Fill_Rect
@@ -118,8 +114,9 @@ TFT_Draw_Pixel:
 ;   R3 = height
 ;   R4 = color
 ; =====================================================================
-TFT_Fill_Rect:
+TFT_Fill_Rect
         PUSH    {R5,R6,R7,R8,LR}
+
         MOV     R5, R0
         MOV     R6, R1
         MOV     R7, R2
@@ -131,9 +128,10 @@ TFT_Fill_Rect:
         BEQ     TFT_Fill_Rect_Done
 
         ADD     R2, R5, R7
-        SUB     R2, R2, #1
+        SUBS    R2, R2, #1
+
         ADD     R3, R6, R8
-        SUB     R3, R3, #1
+        SUBS    R3, R3, #1
 
         MOV     R0, R5
         MOV     R1, R6
@@ -143,9 +141,10 @@ TFT_Fill_Rect:
         MOV     R1, R4
         BL      TFT_Fill_Window_Color
 
-TFT_Fill_Rect_Done:
+TFT_Fill_Rect_Done
         POP     {R5,R6,R7,R8,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Draw_Rect
@@ -158,8 +157,9 @@ TFT_Fill_Rect_Done:
 ;   R3 = height
 ;   R4 = color
 ; =====================================================================
-TFT_Draw_Rect:
+TFT_Draw_Rect
         PUSH    {R5,R6,R7,R8,LR}
+
         MOV     R5, R0
         MOV     R6, R1
         MOV     R7, R2
@@ -169,34 +169,35 @@ TFT_Draw_Rect:
         MOV     R0, R5
         MOV     R1, R6
         MOV     R2, R7
-        MOV     R3, #1
+        MOVS    R3, #1
         BL      TFT_Fill_Rect
 
         ; Bottom
         MOV     R0, R5
         ADD     R1, R6, R8
-        SUB     R1, R1, #1
+        SUBS    R1, R1, #1
         MOV     R2, R7
-        MOV     R3, #1
+        MOVS    R3, #1
         BL      TFT_Fill_Rect
 
         ; Left
         MOV     R0, R5
         MOV     R1, R6
-        MOV     R2, #1
+        MOVS    R2, #1
         MOV     R3, R8
         BL      TFT_Fill_Rect
 
         ; Right
         ADD     R0, R5, R7
-        SUB     R0, R0, #1
+        SUBS    R0, R0, #1
         MOV     R1, R6
-        MOV     R2, #1
+        MOVS    R2, #1
         MOV     R3, R8
         BL      TFT_Fill_Rect
 
         POP     {R5,R6,R7,R8,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; INTERNAL: TFT_GetFontPtr
@@ -209,28 +210,36 @@ TFT_Draw_Rect:
 ; NOTE:
 ;   If char is unsupported, SPACE bitmap is returned.
 ; =====================================================================
-TFT_GetFontPtr:
+TFT_GetFontPtr
         PUSH    {R1,R2,R3,R4,LR}
+
         LDR     R1, =FONT_CHARSET
         LDR     R2, =FONT_BITMAPS
-        MOV     R3, #0
-TFT_GetFontPtr_Search:
+        MOVS    R3, #0
+
+TFT_GetFontPtr_Search
         LDRB    R4, [R1, R3]
         CMP     R4, #0
         BEQ     TFT_GetFontPtr_NotFound
+
         CMP     R4, R0
         BEQ     TFT_GetFontPtr_Found
-        ADD     R3, R3, #1
+
+        ADDS    R3, R3, #1
         B       TFT_GetFontPtr_Search
-TFT_GetFontPtr_Found:
-        ADD     R0, R3, R3, LSL #2      ; index * 5
+
+TFT_GetFontPtr_Found
+        ADD     R0, R3, R3, LSL #2
         ADD     R0, R2, R0
         B       TFT_GetFontPtr_Exit
-TFT_GetFontPtr_NotFound:
+
+TFT_GetFontPtr_NotFound
         LDR     R0, =FONT_BITMAPS
-TFT_GetFontPtr_Exit:
+
+TFT_GetFontPtr_Exit
         POP     {R1,R2,R3,R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; INTERNAL: TFT_Draw_Char
@@ -243,33 +252,33 @@ TFT_GetFontPtr_Exit:
 ;   R3 = foreground color
 ;   R4 = background color
 ; =====================================================================
-TFT_Draw_Char:
+TFT_Draw_Char
         PUSH    {R5,R6,R7,R8,R9,R10,R11,R12,LR}
 
-        MOV     R5, R0                  ; base x
-        MOV     R6, R1                  ; base y
-        MOV     R7, R3                  ; fg color
-        MOV     R8, R4                  ; bg color
+        MOV     R5, R0
+        MOV     R6, R1
+        MOV     R7, R3
+        MOV     R8, R4
 
         MOV     R0, R2
         BL      TFT_GetFontPtr
-        MOV     R9, R0                  ; bitmap pointer
+        MOV     R9, R0
 
-        MOV     R10, #0                 ; column = 0..4
+        MOVS    R10, #0
 
-TFT_Draw_Char_Column_Loop:
+TFT_Draw_Char_Column_Loop
         CMP     R10, #5
         BEQ     TFT_Draw_Char_Spacing
 
         LDRB    R11, [R9, R10]
-        MOV     R12, #0                 ; row = 0..6
+        MOVS    R12, #0
 
-TFT_Draw_Char_Row_Loop:
+TFT_Draw_Char_Row_Loop
         CMP     R12, #7
         BEQ     TFT_Draw_Char_Next_Column
 
-        MOV     R3, #1
-        LSL     R3, R3, R12
+        MOVS    R3, #1
+        LSLS    R3, R3, R12
         TST     R11, R3
         BEQ     TFT_Draw_Char_DrawBG
 
@@ -280,38 +289,40 @@ TFT_Draw_Char_Row_Loop:
         BL      TFT_Draw_Pixel
         B       TFT_Draw_Char_Row_Advance
 
-TFT_Draw_Char_DrawBG:
+TFT_Draw_Char_DrawBG
         ; background pixel
         ADD     R0, R5, R10
         ADD     R1, R6, R12
         MOV     R2, R8
         BL      TFT_Draw_Pixel
 
-TFT_Draw_Char_Row_Advance:
-        ADD     R12, R12, #1
+TFT_Draw_Char_Row_Advance
+        ADDS    R12, R12, #1
         B       TFT_Draw_Char_Row_Loop
 
-TFT_Draw_Char_Next_Column:
-        ADD     R10, R10, #1
+TFT_Draw_Char_Next_Column
+        ADDS    R10, R10, #1
         B       TFT_Draw_Char_Column_Loop
 
-TFT_Draw_Char_Spacing:
-        MOV     R12, #0
-TFT_Draw_Char_Spacing_Loop:
+TFT_Draw_Char_Spacing
+        MOVS    R12, #0
+
+TFT_Draw_Char_Spacing_Loop
         CMP     R12, #7
         BEQ     TFT_Draw_Char_Done
 
-        ADD     R0, R5, #5
+        ADDS    R0, R5, #5
         ADD     R1, R6, R12
         MOV     R2, R8
         BL      TFT_Draw_Pixel
 
-        ADD     R12, R12, #1
+        ADDS    R12, R12, #1
         B       TFT_Draw_Char_Spacing_Loop
 
-TFT_Draw_Char_Done:
+TFT_Draw_Char_Done
         POP     {R5,R6,R7,R8,R9,R10,R11,R12,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Draw_String
@@ -323,20 +334,18 @@ TFT_Draw_Char_Done:
 ;   R2 = string address
 ;   R3 = foreground color
 ;   R4 = background color
-;
 ; NOTE:
-;   R4 is preserved across the whole string so every character receives
-;   the correct background color.
+;   R4 is pushed so background color is preserved across all characters.
 ; =====================================================================
-TFT_Draw_String:
+TFT_Draw_String
         PUSH    {R4,R5,R6,R7,R8,LR}
 
-        MOV     R5, R0                  ; current x
-        MOV     R6, R1                  ; current y
-        MOV     R7, R2                  ; string ptr
-        MOV     R8, R3                  ; fg color
+        MOV     R5, R0
+        MOV     R6, R1
+        MOV     R7, R2
+        MOV     R8, R3
 
-TFT_Draw_String_Loop:
+TFT_Draw_String_Loop
         LDRB    R2, [R7], #1
         CMP     R2, #0
         BEQ     TFT_Draw_String_Done
@@ -346,60 +355,66 @@ TFT_Draw_String_Loop:
         MOV     R3, R8
         BL      TFT_Draw_Char
 
-        ADD     R5, R5, #6
+        ADDS    R5, R5, #6
         B       TFT_Draw_String_Loop
 
-TFT_Draw_String_Done:
+TFT_Draw_String_Done
         POP     {R4,R5,R6,R7,R8,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Clear_Screen
 ; PURPOSE:
 ;   Fill whole screen with black.
 ; =====================================================================
-TFT_Clear_Screen:
+TFT_Clear_Screen
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #TFT_HEIGHT
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        LDR     R3, =TFT_HEIGHT
         LDR     R4, =COLOR_BLACK
         BL      TFT_Fill_Rect
+
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; INTERNAL: TFT_Draw_Smoke_Frame
 ; PURPOSE:
 ;   Draw the static smoke label and smoke bar frame.
+;   Called by both Main Menu and Smoke Alert screens.
 ; =====================================================================
-TFT_Draw_Smoke_Frame:
+TFT_Draw_Smoke_Frame
         PUSH    {R4,LR}
 
-        MOV     R0, #20
-        MOV     R1, #270
+        MOVS    R0, #20
+        LDR     R1, =270
         LDR     R2, =TXT_SMOKE
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
         BL      TFT_Draw_String
 
-        MOV     R0, #SMOKE_BAR_X
-        MOV     R1, #SMOKE_BAR_Y
-        MOV     R2, #SMOKE_BAR_W
-        MOV     R3, #SMOKE_BAR_H
+        MOVS    R0, #SMOKE_BAR_X
+        LDR     R1, =SMOKE_BAR_Y
+        MOVS    R2, #SMOKE_BAR_W
+        MOVS    R3, #SMOKE_BAR_H
         LDR     R4, =COLOR_WHITE
         BL      TFT_Draw_Rect
 
-        MOV     R0, #SMOKE_INNER_X
-        MOV     R1, #SMOKE_INNER_Y
-        MOV     R2, #SMOKE_INNER_W
-        MOV     R3, #SMOKE_INNER_H
+        MOVS    R0, #SMOKE_INNER_X
+        LDR     R1, =SMOKE_INNER_Y
+        MOVS    R2, #SMOKE_INNER_W
+        MOVS    R3, #SMOKE_INNER_H
         LDR     R4, =COLOR_BLACK
         BL      TFT_Fill_Rect
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Update_Smoke_Level
@@ -408,128 +423,131 @@ TFT_Draw_Smoke_Frame:
 ; INPUT:
 ;   R2 = smoke level value
 ; =====================================================================
-TFT_Update_Smoke_Level:
+TFT_Update_Smoke_Level
         PUSH    {R4,R5,R6,LR}
 
         CMP     R2, #0
         BGE     TFT_Update_Smoke_ClampHigh
-        MOV     R2, #0
+        MOVS    R2, #0
 
-TFT_Update_Smoke_ClampHigh:
+TFT_Update_Smoke_ClampHigh
         LDR     R4, =4095
         CMP     R2, R4
         MOVGT   R2, R4
 
-        MOV     R4, #198
+        MOVS    R4, #198
         MUL     R5, R2, R4
         LDR     R4, =4095
         UDIV    R5, R5, R4
 
         LDR     R6, =COLOR_GREEN
-        CMP     R2, #1200
+        LDR     R4, =1200
+        CMP     R2, R4
         BLT     TFT_Update_Smoke_ColorReady
 
         LDR     R6, =COLOR_YELLOW
-        CMP     R2, #2600
+        LDR     R4, =2600
+        CMP     R2, R4
         BLT     TFT_Update_Smoke_ColorReady
 
         LDR     R6, =COLOR_RED
 
-TFT_Update_Smoke_ColorReady:
-        MOV     R0, #SMOKE_INNER_X
-        MOV     R1, #SMOKE_INNER_Y
-        MOV     R2, #SMOKE_INNER_W
-        MOV     R3, #SMOKE_INNER_H
+TFT_Update_Smoke_ColorReady
+        MOVS    R0, #SMOKE_INNER_X
+        LDR     R1, =SMOKE_INNER_Y
+        MOVS    R2, #SMOKE_INNER_W
+        MOVS    R3, #SMOKE_INNER_H
         LDR     R4, =COLOR_BLACK
         BL      TFT_Fill_Rect
 
         CMP     R5, #0
         BEQ     TFT_Update_Smoke_Done
 
-        MOV     R0, #SMOKE_INNER_X
-        MOV     R1, #SMOKE_INNER_Y
+        MOVS    R0, #SMOKE_INNER_X
+        LDR     R1, =SMOKE_INNER_Y
         MOV     R2, R5
-        MOV     R3, #SMOKE_INNER_H
+        MOVS    R3, #SMOKE_INNER_H
         MOV     R4, R6
         BL      TFT_Fill_Rect
 
-TFT_Update_Smoke_Done:
+TFT_Update_Smoke_Done
         POP     {R4,R5,R6,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Main_Menu
 ; PURPOSE:
 ;   Draw main menu screen.
 ; =====================================================================
-TFT_Render_Main_Menu:
+TFT_Render_Main_Menu
         PUSH    {R4,LR}
 
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #32
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #32
         LDR     R4, =COLOR_BLUE
         BL      TFT_Fill_Rect
 
-        MOV     R0, #72
-        MOV     R1, #12
+        LDR     R0, =72
+        MOVS    R1, #12
         LDR     R2, =TXT_MAIN_MENU
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLUE
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #50
-        MOV     R2, #200
-        MOV     R3, #40
+        MOVS    R0, #20
+        MOVS    R1, #50
+        MOVS    R2, #200
+        MOVS    R3, #40
         LDR     R4, =COLOR_CYAN
         BL      TFT_Draw_Rect
 
-        MOV     R0, #50
-        MOV     R1, #64
+        MOVS    R0, #50
+        MOVS    R1, #64
         LDR     R2, =TXT_SANITIZING
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #100
-        MOV     R2, #200
-        MOV     R3, #40
+        MOVS    R0, #20
+        MOVS    R1, #100
+        MOVS    R2, #200
+        MOVS    R3, #40
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_Rect
 
-        MOV     R0, #55
-        MOV     R1, #114
+        MOVS    R0, #55
+        LDR     R1, =114
         LDR     R2, =TXT_HEART_RATE
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #150
-        MOV     R2, #200
-        MOV     R3, #40
+        MOVS    R0, #20
+        LDR     R1, =150
+        MOVS    R2, #200
+        MOVS    R3, #40
         LDR     R4, =COLOR_GREEN
         BL      TFT_Draw_Rect
 
-        MOV     R0, #58
-        MOV     R1, #164
+        MOVS    R0, #58
+        LDR     R1, =164
         LDR     R2, =TXT_BREATHING
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #200
-        MOV     R2, #200
-        MOV     R3, #40
+        MOVS    R0, #20
+        LDR     R1, =200
+        MOVS    R2, #200
+        MOVS    R3, #40
         LDR     R4, =COLOR_YELLOW
         BL      TFT_Draw_Rect
 
-        MOV     R0, #62
-        MOV     R1, #214
+        MOVS    R0, #62
+        LDR     R1, =214
         LDR     R2, =TXT_MED_INPUT
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -539,37 +557,39 @@ TFT_Render_Main_Menu:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Sanitizing
 ; PURPOSE:
 ;   Draw sanitizing screen.
 ; =====================================================================
-TFT_Render_Sanitizing:
+TFT_Render_Sanitizing
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_CYAN
         BL      TFT_Fill_Rect
 
-        MOV     R0, #52
-        MOV     R1, #20
+        MOVS    R0, #52
+        MOVS    R1, #20
         LDR     R2, =TXT_SANITIZING
         LDR     R3, =COLOR_BLACK
         LDR     R4, =COLOR_CYAN
         BL      TFT_Draw_String
 
-        MOV     R0, #40
-        MOV     R1, #120
-        MOV     R2, #160
-        MOV     R3, #80
+        MOVS    R0, #40
+        LDR     R1, =120
+        MOVS    R2, #160
+        MOVS    R3, #80
         LDR     R4, =COLOR_CYAN
         BL      TFT_Draw_Rect
 
-        MOV     R0, #70
-        MOV     R1, #155
+        MOVS    R0, #70
+        LDR     R1, =155
         LDR     R2, =TXT_ACTIVE
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -577,37 +597,39 @@ TFT_Render_Sanitizing:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Heart_Rate
 ; PURPOSE:
 ;   Draw heart-rate screen.
 ; =====================================================================
-TFT_Render_Heart_Rate:
+TFT_Render_Heart_Rate
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_RED
         BL      TFT_Fill_Rect
 
-        MOV     R0, #48
-        MOV     R1, #20
+        MOVS    R0, #48
+        MOVS    R1, #20
         LDR     R2, =TXT_HEART_RATE
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_String
 
-        MOV     R0, #35
-        MOV     R1, #110
-        MOV     R2, #170
-        MOV     R3, #100
+        MOVS    R0, #35
+        LDR     R1, =110
+        LDR     R2, =170
+        LDR     R3, =100
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_Rect
 
-        MOV     R0, #82
-        MOV     R1, #150
+        LDR     R0, =82
+        LDR     R1, =150
         LDR     R2, =TXT_BPM
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -615,37 +637,39 @@ TFT_Render_Heart_Rate:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Breathing
 ; PURPOSE:
 ;   Draw breathing screen.
 ; =====================================================================
-TFT_Render_Breathing:
+TFT_Render_Breathing
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_GREEN
         BL      TFT_Fill_Rect
 
-        MOV     R0, #56
-        MOV     R1, #20
+        MOVS    R0, #56
+        MOVS    R1, #20
         LDR     R2, =TXT_BREATHING
         LDR     R3, =COLOR_BLACK
         LDR     R4, =COLOR_GREEN
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #110
-        MOV     R2, #200
-        MOV     R3, #80
+        MOVS    R0, #20
+        LDR     R1, =110
+        MOVS    R2, #200
+        MOVS    R3, #80
         LDR     R4, =COLOR_GREEN
         BL      TFT_Draw_Rect
 
-        MOV     R0, #70
-        MOV     R1, #145
+        MOVS    R0, #70
+        LDR     R1, =145
         LDR     R2, =TXT_MONITOR
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -653,37 +677,39 @@ TFT_Render_Breathing:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Med_Input
 ; PURPOSE:
 ;   Draw medicine input screen.
 ; =====================================================================
-TFT_Render_Med_Input:
+TFT_Render_Med_Input
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_YELLOW
         BL      TFT_Fill_Rect
 
-        MOV     R0, #56
-        MOV     R1, #20
+        MOVS    R0, #56
+        MOVS    R1, #20
         LDR     R2, =TXT_MED_INPUT
         LDR     R3, =COLOR_BLACK
         LDR     R4, =COLOR_YELLOW
         BL      TFT_Draw_String
 
-        MOV     R0, #25
-        MOV     R1, #100
-        MOV     R2, #190
-        MOV     R3, #110
+        MOVS    R0, #25
+        LDR     R1, =100
+        MOVS    R2, #190
+        LDR     R3, =110
         LDR     R4, =COLOR_YELLOW
         BL      TFT_Draw_Rect
 
-        MOV     R0, #45
-        MOV     R1, #145
+        MOVS    R0, #45
+        LDR     R1, =145
         LDR     R2, =TXT_ENTER_TIME
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -691,30 +717,32 @@ TFT_Render_Med_Input:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Med_Alert
 ; PURPOSE:
 ;   Draw medicine alert screen.
 ; =====================================================================
-TFT_Render_Med_Alert:
+TFT_Render_Med_Alert
         PUSH    {R4,LR}
-        MOV     R0, #20
-        MOV     R1, #60
-        MOV     R2, #200
-        MOV     R3, #160
+
+        MOVS    R0, #20
+        MOVS    R1, #60
+        MOVS    R2, #200
+        LDR     R3, =160
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_Rect
 
-        MOV     R0, #72
-        MOV     R1, #105
+        LDR     R0, =72
+        LDR     R1, =105
         LDR     R2, =TXT_MED_ALERT
         LDR     R3, =COLOR_RED
         LDR     R4, =COLOR_BLACK
         BL      TFT_Draw_String
 
-        MOV     R0, #52
-        MOV     R1, #140
+        MOVS    R0, #52
+        LDR     R1, =140
         LDR     R2, =TXT_TIME_NOW
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -722,6 +750,7 @@ TFT_Render_Med_Alert:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Med_Despense
@@ -730,31 +759,32 @@ TFT_Render_Med_Alert:
 ; NOTE:
 ;   Name kept EXACTLY as required by ui_state.s
 ; =====================================================================
-TFT_Render_Med_Despense:
+TFT_Render_Med_Despense
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_ORANGE
         BL      TFT_Fill_Rect
 
-        MOV     R0, #42
-        MOV     R1, #20
+        MOVS    R0, #42
+        MOVS    R1, #20
         LDR     R2, =TXT_MED_DESPENSE
         LDR     R3, =COLOR_BLACK
         LDR     R4, =COLOR_ORANGE
         BL      TFT_Draw_String
 
-        MOV     R0, #40
-        MOV     R1, #110
-        MOV     R2, #160
-        MOV     R3, #90
+        MOVS    R0, #40
+        LDR     R1, =110
+        MOVS    R2, #160
+        MOVS    R3, #90
         LDR     R4, =COLOR_ORANGE
         BL      TFT_Draw_Rect
 
-        MOV     R0, #68
-        MOV     R1, #150
+        MOVS    R0, #68
+        LDR     R1, =150
         LDR     R2, =TXT_DISPENSE
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_BLACK
@@ -762,37 +792,39 @@ TFT_Render_Med_Despense:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; FUNCTION: TFT_Render_Smoke_ALERT
 ; PURPOSE:
 ;   Draw smoke alert screen.
 ; =====================================================================
-TFT_Render_Smoke_ALERT:
+TFT_Render_Smoke_ALERT
         PUSH    {R4,LR}
-        MOV     R0, #0
-        MOV     R1, #0
-        MOV     R2, #TFT_WIDTH
-        MOV     R3, #50
+
+        MOVS    R0, #0
+        MOVS    R1, #0
+        MOVS    R2, #TFT_WIDTH
+        MOVS    R3, #50
         LDR     R4, =COLOR_RED
         BL      TFT_Fill_Rect
 
-        MOV     R0, #48
-        MOV     R1, #20
+        MOVS    R0, #48
+        MOVS    R1, #20
         LDR     R2, =TXT_SMOKE_ALERT
         LDR     R3, =COLOR_WHITE
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_String
 
-        MOV     R0, #20
-        MOV     R1, #90
-        MOV     R2, #200
-        MOV     R3, #110
+        MOVS    R0, #20
+        MOVS    R1, #90
+        MOVS    R2, #200
+        LDR     R3, =110
         LDR     R4, =COLOR_RED
         BL      TFT_Draw_Rect
 
-        MOV     R0, #78
-        MOV     R1, #135
+        LDR     R0, =78
+        LDR     R1, =135
         LDR     R2, =TXT_DANGER
         LDR     R3, =COLOR_RED
         LDR     R4, =COLOR_BLACK
@@ -802,10 +834,10 @@ TFT_Render_Smoke_ALERT:
 
         POP     {R4,LR}
         BX      LR
+        LTORG
 
 ; =====================================================================
 ; SUPPORTED FONT CHARACTERS
-; Only the characters actually needed by the UI text are included.
 ; =====================================================================
 FONT_CHARSET
         DCB     ' '
@@ -851,17 +883,12 @@ FONT_CHARSET
 
 ; =====================================================================
 ; 5x7 FONT BITMAPS
-; One entry = 5 bytes, same order as FONT_CHARSET.
 ; =====================================================================
 FONT_BITMAPS
-        ; ' '
         DCB 0x00,0x00,0x00,0x00,0x00
-        ; '-'
         DCB 0x08,0x08,0x08,0x08,0x08
-        ; ':'
         DCB 0x00,0x36,0x36,0x00,0x00
 
-        ; '0'..'9'
         DCB 0x3E,0x51,0x49,0x45,0x3E
         DCB 0x00,0x42,0x7F,0x40,0x00
         DCB 0x42,0x61,0x51,0x49,0x46
@@ -873,7 +900,6 @@ FONT_BITMAPS
         DCB 0x36,0x49,0x49,0x49,0x36
         DCB 0x06,0x49,0x49,0x29,0x1E
 
-        ; 'A'..'Z'
         DCB 0x7E,0x11,0x11,0x11,0x7E
         DCB 0x7F,0x49,0x49,0x49,0x36
         DCB 0x3E,0x41,0x41,0x41,0x22
@@ -903,7 +929,6 @@ FONT_BITMAPS
 
 ; =====================================================================
 ; UI TEXT STRINGS
-; All uppercase because the compact font table supports uppercase only.
 ; =====================================================================
 TXT_MAIN_MENU       DCB "MAIN MENU",0
 TXT_SANITIZING      DCB "SANITIZING",0
