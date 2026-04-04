@@ -4,6 +4,13 @@
 ; =====================================================================
 
         AREA    VARIABLES, DATA, READWRITE
+	EXPORT  g_sys_state
+        EXPORT  g_prev_state
+        EXPORT  g_bpm
+        EXPORT  g_smoke_level
+        EXPORT  g_alarm_flags
+        EXPORT  g_med_timer
+        EXPORT  g_keycode
         ALIGN
 
 ; --- System Core Globals ---
