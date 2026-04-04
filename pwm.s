@@ -23,6 +23,8 @@
         IMPORT  GPIO_AFRH
 
 ; ========================= Timer and GPIO Offsets =========================
+GPIO_AFRL       EQU     0x20
+GPIO_AFRH       EQU     0x24
 TIM3_BASE       EQU     0x40000400
 TIM4_BASE       EQU     0x40000800
 TIM_CR1         EQU     0x00
