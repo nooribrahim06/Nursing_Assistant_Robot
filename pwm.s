@@ -21,19 +21,20 @@
         IMPORT  ACT_SERVO_MED    ; PA7
         IMPORT  GPIO_AFRL
         IMPORT  GPIO_AFRH
-        IMPORT  TIM3_BASE
-        IMPORT  TIM4_BASE
-        IMPORT  TIM_CR1      
-        IMPORT  TIM_PSC      
-        IMPORT  TIM_ARR      
-        IMPORT  TIM_CCMR1    
-        IMPORT  TIM_CCMR2    
-        IMPORT  TIM_CCER     
-        IMPORT  TIM_CCR1     
-        IMPORT  TIM_CCR2     
-        IMPORT  TIM_CCR3     
-        IMPORT  TIM_CCR4
 
+; ========================= Timer and GPIO Offsets =========================
+TIM3_BASE       EQU     0x40000400
+TIM4_BASE       EQU     0x40000800
+TIM_CR1         EQU     0x00
+TIM_PSC         EQU     0x28
+TIM_ARR         EQU     0x2C
+TIM_CCMR1       EQU     0x18
+TIM_CCMR2       EQU     0x1C
+TIM_CCER        EQU     0x20
+TIM_CCR1        EQU     0x34
+TIM_CCR2        EQU     0x38
+TIM_CCR3        EQU     0x3C
+TIM_CCR4        EQU     0x40
 ; ---------------------------------------------------------------------
 ; PWM_Init: Initialize timers and pins to Alternate Function (AF)
 ; ---------------------------------------------------------------------
