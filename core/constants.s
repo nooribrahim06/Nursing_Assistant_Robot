@@ -1,131 +1,142 @@
-AREA    CONSTANTS, DATA, READONLY
+;=============================================================================
+; constants.s
+; INCLUDE-ONLY file
+; Use with: GET constants.s
+; Do not keep AREA/END here.
+;=============================================================================
 
-; ========================= RCC =========================
-RCC_BASE        EQU     0x40023800
-RCC_AHB1ENR     EQU     0x30
-RCC_APB1ENR     EQU     0x40
-RCC_APB2ENR     EQU     0x44
+;========================= RCC =========================
+RCC_BASE            EQU     0x40023800
+RCC_AHB1ENR         EQU     0x30
+RCC_APB1ENR         EQU     0x40
+RCC_APB2ENR         EQU     0x44
 
-; ========================= GPIO BASE =========================
-GPIOA_BASE      EQU     0x40020000
-GPIOB_BASE      EQU     0x40020400
-GPIOC_BASE      EQU     0x40020800
+;========================= GPIO BASE =========================
+GPIOA_BASE          EQU     0x40020000
+GPIOB_BASE          EQU     0x40020400
+GPIOC_BASE          EQU     0x40020800
 
-; ========================= GPIO OFFSETS =========================
-GPIO_MODER      EQU     0x00
-GPIO_OTYPER     EQU     0x04
-GPIO_OSPEEDR    EQU     0x08
-GPIO_PUPDR      EQU     0x0C
-GPIO_IDR        EQU     0x10
-GPIO_ODR        EQU     0x14
-GPIO_BSRR       EQU     0x18
+;========================= GPIO OFFSETS =========================
+GPIO_MODER          EQU     0x00
+GPIO_OTYPER         EQU     0x04
+GPIO_OSPEEDR        EQU     0x08
+GPIO_PUPDR          EQU     0x0C
+GPIO_IDR            EQU     0x10
+GPIO_ODR            EQU     0x14
+GPIO_BSRR           EQU     0x18
 
-; ========================= BIT MASKS =========================
-BIT0    EQU     1
-BIT1    EQU     2
-BIT2    EQU     4
-BIT3    EQU     8
-BIT4    EQU     16
-BIT5    EQU     32
-BIT6    EQU     64
-BIT7    EQU     128
-BIT8    EQU     256
-BIT9    EQU     512
-BIT10   EQU     1024
-BIT11   EQU     2048
-BIT12   EQU     4096
-BIT13   EQU     8192
-BIT14   EQU     16384
-BIT15   EQU     32768
+;========================= BIT MASKS =========================
+BIT0                EQU     1
+BIT1                EQU     2
+BIT2                EQU     4
+BIT3                EQU     8
+BIT4                EQU     16
+BIT5                EQU     32
+BIT6                EQU     64
+BIT7                EQU     128
+BIT8                EQU     256
+BIT9                EQU     512
+BIT10               EQU     1024
+BIT11               EQU     2048
+BIT12               EQU     4096
+BIT13               EQU     8192
+BIT14               EQU     16384
+BIT15               EQU     32768
 
-; ========================= TFT =========================
-TFT_DATA_MASK   EQU     0x00000FF0
+;========================= TFT =========================
+TFT_DATA_MASK       EQU     0x00000FF0
 
-TFT_RS_PIN      EQU     2
-TFT_WR_PIN      EQU     3
-TFT_RD_PIN      EQU     4
-TFT_CS_PIN      EQU     5
-TFT_RST_PIN     EQU     12
+TFT_RS_PIN          EQU     2
+TFT_WR_PIN          EQU     3
+TFT_RD_PIN          EQU     4
+TFT_CS_PIN          EQU     5
+TFT_RST_PIN         EQU     12
 
-; ========================= ADC SENSORS =========================
-SNS_BREATH_ADC  EQU     0
-SNS_SMOKE_ADC   EQU     1
+;========================= ADC SENSORS =========================
+SNS_BREATH_ADC      EQU     0
+SNS_SMOKE_ADC       EQU     1
 
-; ========================= SERVOS =========================
-ACT_SERVO_SAN   EQU     6
-ACT_SERVO_MED   EQU     7
+;========================= SERVOS =========================
+ACT_SERVO_SAN       EQU     6
+ACT_SERVO_MED       EQU     7
 
-; ========================= BUZZER =========================
-BUZZER_PIN      EQU     3
+;========================= BUZZER =========================
+BUZZER_PIN          EQU     3
 
-; ========================= MOTION =========================
-MOT_IN1         EQU     8
-MOT_IN2         EQU     9
-MOT_IN3         EQU     10
-MOT_IN4         EQU     11
+;========================= MOTION =========================
+MOT_IN1             EQU     8
+MOT_IN2             EQU     9
+MOT_IN3             EQU     10
+MOT_IN4             EQU     11
 
-MOT_ENA         EQU     8
-MOT_ENB         EQU     9
+MOT_ENA             EQU     8
+MOT_ENB             EQU     9
 
-; ========================= I2C =========================
-I2C_SCL_PIN     EQU     6
-I2C_SDA_PIN     EQU     7
+MOTION_STOP         EQU     0
 
-; ========================= LINE TRACKER =========================
-LINE_LEFT       EQU     0
-LINE_CENTER     EQU     1
-LINE_RIGHT      EQU     2
+;========================= I2C =========================
+I2C_SCL_PIN         EQU     6
+I2C_SDA_PIN         EQU     7
 
-; ========================= KEYPAD =========================
-KEY_ROW1        EQU     0
-KEY_ROW2        EQU     1
-KEY_ROW3        EQU     2
-KEY_ROW4        EQU     10
+;========================= LINE TRACKER =========================
+LINE_LEFT           EQU     0
+LINE_CENTER         EQU     1
+LINE_RIGHT          EQU     2
 
-KEY_COL1        EQU     12
-KEY_COL2        EQU     13
-KEY_COL3        EQU     14
-KEY_COL4        EQU     15
-; ========================= KEYPAD KEY CODES =========================
-; Assigned left-to-right, top-to-bottom matching physical layout
+;========================= KEYPAD =========================
+KEY_ROW1            EQU     0
+KEY_ROW2            EQU     1
+KEY_ROW3            EQU     2
+KEY_ROW4            EQU     10
+
+KEY_COL1            EQU     12
+KEY_COL2            EQU     13
+KEY_COL3            EQU     14
+KEY_COL4            EQU     15
+
+;========================= KEYPAD KEY CODES =========================
+; Physical layout:
 ; Row 0: 1 2 3 A
 ; Row 1: 4 5 6 B
 ; Row 2: 7 8 9 C
 ; Row 3: * 0 # D
 
-KEY_NONE    EQU     0       ; no key pressed
+KEY_NONE            EQU     0       ; no key pressed
 
-KEY_1       EQU     1
-KEY_2       EQU     2
-KEY_3       EQU     3
-KEY_A       EQU     4
+KEY_1               EQU     1
+KEY_2               EQU     2
+KEY_3               EQU     3
+KEY_A               EQU     4
 
-KEY_4       EQU     5
-KEY_5       EQU     6
-KEY_6       EQU     7
-KEY_B       EQU     8
+KEY_4               EQU     5
+KEY_5               EQU     6
+KEY_6               EQU     7
+KEY_B               EQU     8
 
-KEY_7       EQU     9
-KEY_8       EQU     10
-KEY_9       EQU     11
-KEY_C       EQU     12
+KEY_7               EQU     9
+KEY_8               EQU     10
+KEY_9               EQU     11
+KEY_C               EQU     12
 
-KEY_STAR    EQU     13
-KEY_0       EQU     14
-KEY_HASH    EQU     15
-KEY_D       EQU     16
-; ========================= SYSTEM FLAGS Masks=========================
+KEY_STAR            EQU     13
+KEY_0               EQU     14
+KEY_HASH            EQU     15
+KEY_D               EQU     16
+
+;========================= SYSTEM FLAGS =========================
 Smoke_Alert_Flag    EQU     1
 Med_Alert_Flag      EQU     2
-; ========================= SYSTEM STATES =========================
-STATE_MAIN_MENU     EQU    0
-STATE_SANITIZING    EQU    1
-STATE_HEART_RATE    EQU    2
-STATE_BREATHING     EQU    3
-STATE_MOTION        EQU    5
-STATE_MED_ALERT     EQU    4
-STATE_MED_INPUT     EQU    6
-STATE_MED_DISPENSE  EQU    7
-STATE_SMOKE_ALERT   EQU    8
+
+;========================= SYSTEM STATES =========================
+STATE_MAIN_MENU     EQU     0
+STATE_SANITIZING    EQU     1
+STATE_HEART_RATE    EQU     2
+STATE_BREATHING     EQU     3
+STATE_MED_ALERT     EQU     4
+STATE_MOTION        EQU     5
+STATE_MED_INPUT     EQU     6
+STATE_MED_DISPENSE  EQU     7
+STATE_SMOKE_ALERT   EQU     8
 STATE_MED_WAITING   EQU     9
-        END
+
+STATE_INVALID       EQU     0xFFFFFFFF

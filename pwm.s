@@ -5,21 +5,10 @@
 ; =====================================================================
 
         AREA    PWM_CODE, CODE, READONLY
+        GET     core\constants.inc
         EXPORT  PWM_Init
         EXPORT  PWM_Set_Motor_Speed
         EXPORT  PWM_Set_Servo_Pos
-
-        ; Import constants and base addresses
-        IMPORT  RCC_BASE
-        IMPORT  RCC_APB1ENR
-        IMPORT  GPIOA_BASE
-        IMPORT  GPIOB_BASE
-        IMPORT  GPIO_MODER
-        IMPORT  MOT_ENA          ; PB8
-        IMPORT  MOT_ENB          ; PB9
-        IMPORT  ACT_SERVO_SAN    ; PA6
-        IMPORT  ACT_SERVO_MED    ; PA7
-
 
 ; ========================= Timer and GPIO Offsets =========================
 GPIO_AFRL       EQU     0x20

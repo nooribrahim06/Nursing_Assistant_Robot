@@ -5,6 +5,7 @@
 ; =====================================================================
 
         AREA    MOTION_CODE, CODE, READONLY
+        GET     core\constants.inc
         EXPORT  MOT_Init
         EXPORT  MOT_Update
         
@@ -17,18 +18,6 @@
         IMPORT  GPIO_ReadPin
         IMPORT  PWM_Init
         IMPORT  PWM_Set_Motor_Speed
-        
-        ; Import constants
-        IMPORT  GPIOA_BASE
-        IMPORT  GPIOB_BASE
-        IMPORT  GPIOC_BASE
-        IMPORT  MOT_IN1
-        IMPORT  MOT_IN2
-        IMPORT  MOT_IN3
-        IMPORT  MOT_IN4
-        IMPORT  LINE_LEFT
-        IMPORT  LINE_CENTER
-        IMPORT  LINE_RIGHT
         
         ; Import global variables
         IMPORT  g_motion_state
