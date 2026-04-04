@@ -19,8 +19,7 @@
         IMPORT  MOT_ENB          ; PB9
         IMPORT  ACT_SERVO_SAN    ; PA6
         IMPORT  ACT_SERVO_MED    ; PA7
-        IMPORT  GPIO_AFRL
-        IMPORT  GPIO_AFRH
+
 
 ; ========================= Timer and GPIO Offsets =========================
 GPIO_AFRL       EQU     0x20
