@@ -3,7 +3,8 @@
 ; DESCRIPTION: Full motion control logic with PWM and Line Tracking
 ; LAYER: Feature Module (Layer 2)
 ; =====================================================================
-
+        	INCLUDE constants.s
+        
         AREA    MOTION_CODE, CODE, READONLY
         EXPORT  MOT_Init
         EXPORT  MOT_Update
@@ -17,18 +18,6 @@
         IMPORT  GPIO_ReadPin
         IMPORT  PWM_Init
         IMPORT  PWM_Set_Motor_Speed
-        
-        ; Import constants
-        IMPORT  GPIOA_BASE
-        IMPORT  GPIOB_BASE
-        IMPORT  GPIOC_BASE
-        IMPORT  MOT_IN1
-        IMPORT  MOT_IN2
-        IMPORT  MOT_IN3
-        IMPORT  MOT_IN4
-        IMPORT  LINE_LEFT
-        IMPORT  LINE_CENTER
-        IMPORT  LINE_RIGHT
         
         ; Import global variables
         IMPORT  g_motion_state
@@ -75,82 +64,127 @@ MOT_Init
 
 ; ---------------------------------------------------------------------
 ; Subroutine: MOT_Update
-; Purpose: Main logic loop for line following
+; Purpose: Main logic loop for line following (Embedded Legacy Logic)
+; ---------------------------------------------------------------------
+; ---------------------------------------------------------------------
+; Subroutine: MOT_Update
+; Purpose: Main logic loop for line following (Embedded Legacy Logic)
 ; ---------------------------------------------------------------------
 MOT_Update
-        PUSH    {R4-R6, LR}     ; Save protected registers
+        PUSH    {R4-R7, LR}     ; Save protected registers
 
-        ; Read the state of the three sensors
+        ; 1. Read Left Sensor (PC0) and shift it to Bit 2 (100)
         LDR     R0, =GPIOC_BASE
         MOV     R1, #LINE_LEFT
         BL      GPIO_ReadPin
-        MOV     R4, R0          ; R4 = Left sensor state
+        LSL     R4, R0, #2      
 
+        ; 2. Read Center Sensor (PC1) and shift it to Bit 1 (010)
+        LDR     R0, =GPIOC_BASE     ; <--- THE VISION FIX
         MOV     R1, #LINE_CENTER
         BL      GPIO_ReadPin
-        MOV     R5, R0          ; R5 = Center sensor state
+        LSL     R5, R0, #1      
 
+        ; 3. Read Right Sensor (PC2) at Bit 0 (001)
+        LDR     R0, =GPIOC_BASE     ; <--- THE VISION FIX
         MOV     R1, #LINE_RIGHT
         BL      GPIO_ReadPin
-        MOV     R6, R0          ; R6 = Right sensor state
+        MOV     R6, R0          
 
-        ; Decision-making logic based on sensor readings
-        CMP     R5, #1          ; Is the line in the center?
-        BEQ     Action_Forward
-
-        CMP     R4, #1          ; Is the line to the left?
-        BEQ     Action_Turn_Left
-
-        CMP     R6, #1          ; Is the line to the right?
-        BEQ     Action_Turn_Right
-
-        B       Action_Stop     ; No line detected (lost)
-
-Action_Forward
-        BL      Set_Dir_Forward ; Set direction pins for forward motion
-        LDR     R2, =g_motion_state
-        MOV     R3, #1          ; State code: 1 = Forward
-        STR     R3, [R2]
+        ; 4. Combine them into a single 3-bit mask in R7
+        ORR     R7, R4, R5
+        ORR     R7, R7, R6
         
-        MOV     R0, #800        ; Right motor speed 80% 
-        MOV     R1, #800        ; Left motor speed 80%
-        BL      PWM_Set_Motor_Speed
-        B       End_Update
+        ; 5. Invert the bits (Active-Low to Active-High)
+        EOR     R7, R7, #0x07
 
-Action_Turn_Left
+        ; ==========================================
+        ; The 8-State Legacy Decision Tree
+        ; ==========================================
+        CMP     R7, #0x02       ; STRAIGHT_FORWARD (010)
+        BEQ     Action_Straight
+
+        CMP     R7, #0x07       ; SEARCH_STRAIGHT (111)
+        BEQ     Action_Search
+
+        CMP     R7, #0x06       ; SLIGHT_LEFT (110)
+        BEQ     Action_Slight_Left 
+
+        CMP     R7, #0x04       ; SHARP_LEFT (100)
+        BEQ     Action_Sharp_Left
+
+        CMP     R7, #0x03       ; SLIGHT_RIGHT (011)
+        BEQ     Action_Slight_Right 
+
+        CMP     R7, #0x01       ; SHARP_RIGHT (001)
+        BEQ     Action_Sharp_Right
+
+        CMP     R7, #0x05       ; SEARCH_RIGHT (101)
+        BEQ     Action_Sharp_Right
+
+        CMP     R7, #0x00       ; SEARCH (000 - Lost Line)
+        BEQ     Action_Search
+
+        B       Action_Search   ; Fallback safety
+
+; ==========================================
+; Movement Execution (Using the new PWM Driver)
+; Recall: R0 = Right Speed, R1 = Left Speed
+; ==========================================
+Action_Straight
         BL      Set_Dir_Forward
-        LDR     R2, =g_motion_state
-        MOV     R3, #2          ; State code: 2 = Turning Left
-        STR     R3, [R2]
-        
-        MOV     R0, #750        ; Push from the right to turn left
-        MOV     R1, #250        ; Reduce left motor speed
+        MOV     R0, #383        ; Right = QUARTER_SPEED
+        MOV     R1, #383        ; Left = QUARTER_SPEED
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
-Action_Turn_Right
+Action_Slight_Left
         BL      Set_Dir_Forward
-        LDR     R2, =g_motion_state
-        MOV     R3, #3          ; State code: 3 = Turning Right
-        STR     R3, [R2]
-        
-        MOV     R0, #250        ; Reduce right motor speed
-        MOV     R1, #750        ; Push from the left to turn right
+        MOV     R0, #499        ; Right = HALF_SPEED
+        MOV     R1, #383        ; Left = QUARTER_SPEED 
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
-Action_Stop
-        LDR     R2, =g_motion_state
-        MOV     R3, #0          ; State code: 0 = Stopped
-        STR     R3, [R2]
+Action_Sharp_Left
+        BL      Set_Dir_Forward
+        MOV     R0, #499        ; Right = HALF_SPEED
+        MOV     R1, #124        ; Left = EIGHTH_SPEED
+        BL      PWM_Set_Motor_Speed
+        B       End_Update
+
+Action_Slight_Right
+        BL      Set_Dir_Forward
+        MOV     R0, #383        ; Right = QUARTER_SPEED
+        MOV     R1, #499        ; Left = HALF_SPEED
+        BL      PWM_Set_Motor_Speed
+        B       End_Update
+
+Action_Sharp_Right
+        BL      Set_Dir_Forward
+        MOV     R0, #124        ; Right = EIGHTH_SPEED
+        MOV     R1, #499        ; Left = HALF_SPEED
+        BL      PWM_Set_Motor_Speed
+        B       End_Update
+
+Action_Search
+        ; ACTIVE BRAKING: Lock the H-Bridge to kill inertia
+        LDR     R0, =GPIOA_BASE
+        MOV     R1, #MOT_IN1
+        BL      GPIO_WritePin     ; IN1 = HIGH
+        MOV     R1, #MOT_IN2
+        BL      GPIO_WritePin     ; IN2 = HIGH
+        MOV     R1, #MOT_IN3
+        BL      GPIO_WritePin     ; IN3 = HIGH
+        MOV     R1, #MOT_IN4
+        BL      GPIO_WritePin     ; IN4 = HIGH
         
-        MOV     R0, #0          ; Stop speed completely (0%)
-        MOV     R1, #0
+        MOV     R0, #1000         ; PWM = 100% to engage the lock
+        MOV     R1, #1000
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
 End_Update
-        POP     {R4-R6, PC}     ; Restore registers and return
+        POP     {R4-R7, PC}     ; Restore registers and return
 
 ; ---------------------------------------------------------------------
 ; Helper: Set_Dir_Forward
@@ -169,4 +203,4 @@ Set_Dir_Forward
         BL      GPIO_ClearPin   ; IN4 = Low
         POP     {PC}
 
-        END
+         END

@@ -3,39 +3,15 @@
 ; DESCRIPTION: PWM Driver for Speed Control and Servo Actuation
 ; LAYER: Low-Level Driver (Layer 3)
 ; =====================================================================
-
+		INCLUDE constants.s
         AREA    PWM_CODE, CODE, READONLY
         EXPORT  PWM_Init
         EXPORT  PWM_Set_Motor_Speed
         EXPORT  PWM_Set_Servo_Pos
 
         ; Import constants and base addresses
-        IMPORT  RCC_BASE
-        IMPORT  RCC_APB1ENR
-        IMPORT  GPIOA_BASE
-        IMPORT  GPIOB_BASE
-        IMPORT  GPIO_MODER
-        IMPORT  MOT_ENA          ; PB8
-        IMPORT  MOT_ENB          ; PB9
-        IMPORT  ACT_SERVO_SAN    ; PA6
-        IMPORT  ACT_SERVO_MED    ; PA7
+        
 
-
-; ========================= Timer and GPIO Offsets =========================
-GPIO_AFRL       EQU     0x20
-GPIO_AFRH       EQU     0x24
-TIM3_BASE       EQU     0x40000400
-TIM4_BASE       EQU     0x40000800
-TIM_CR1         EQU     0x00
-TIM_PSC         EQU     0x28
-TIM_ARR         EQU     0x2C
-TIM_CCMR1       EQU     0x18
-TIM_CCMR2       EQU     0x1C
-TIM_CCER        EQU     0x20
-TIM_CCR1        EQU     0x34
-TIM_CCR2        EQU     0x38
-TIM_CCR3        EQU     0x3C
-TIM_CCR4        EQU     0x40
 ; ---------------------------------------------------------------------
 ; PWM_Init: Initialize timers and pins to Alternate Function (AF)
 ; ---------------------------------------------------------------------
@@ -146,3 +122,4 @@ PWM_Set_Servo_Pos
         STREQ   R0, [R4, #TIM_CCR1] ; Update PA6 (Sanitizing) 
         STRNE   R0, [R4, #TIM_CCR2] ; Update PA7 (Medicine) 
         POP     {R4,PC}
+		END
