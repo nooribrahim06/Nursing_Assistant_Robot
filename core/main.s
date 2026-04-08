@@ -1,31 +1,37 @@
 ;=============================================================================
-; main.s
-; Top-level core control for the nurse assistant robot
+; main.s  –  Unified build
 ;
-; This file owns:
-;   - entry point
-;   - shared globals initialization
-;   - initial state setup
-;   - the infinite superloop
-;   - top-level dispatch shape
+; TFT display  (via stolen tft_low.s – self-contained GPIO init):
+;   PA2  = RS   PA3  = WR   PA4  = RD   PA5  = CS   PA12 = RST
+;   PB0..PB7 = D0..D7
 ;
-; This file does NOT own:
-;   - screen content decisions        -> ui_state.s
-;   - keypad scan implementation      -> keypad.s
-;   - feature logic                   -> feature modules
-;   - low-level hardware access       -> drivers
+; Smoke sensor:
+;   PA1  -> MQ2 analog input  (ADC1_IN1)
+;
+; LED alarm:
+;   PB8  -> alarm LED  (moved OFF PB12 to avoid RST conflict)
+;
+; Servos:
+;   PA6  -> sanitizing servo  (TIM3_CH1)
+;   PA7  -> medicine servo    (TIM3_CH2)
+;
+; Keypad:
+;   Rows  PA8..PA11  /  Cols PB10,PB13..PB15
 ;=============================================================================
+
+        GET     constants.s
 
         AREA    MAIN_CODE, CODE, READONLY
         THUMB
         PRESERVE8
         ALIGN
 
-        GET     constants.s
-
         EXPORT  __main
         EXPORT  Main_Entry
 
+;-----------------------------------------------------------------------------
+; Globals
+;-----------------------------------------------------------------------------
         IMPORT  g_sys_state
         IMPORT  g_prev_state
         IMPORT  g_alarm_flags
@@ -39,79 +45,84 @@
         IMPORT  g_hr_ir_raw
         IMPORT  g_motion_state
 
+;-----------------------------------------------------------------------------
+; External routines
+;-----------------------------------------------------------------------------
+        IMPORT  GPIO_EnableClock
+        IMPORT  GPIO_ConfigOutput
+        IMPORT  GPIO_WritePin
+        IMPORT  GPIO_ClearPin
+
+        IMPORT  ADC_Init
+        IMPORT  Smoke_Check
+
+        IMPORT  PWM_Init
+        IMPORT  PWM_Set_Servo_Pos
+
+        IMPORT  TFT_Init
         IMPORT  UI_Update
 
+        IMPORT  Keypad_Init
+        IMPORT  Keypad_Scan
+
+;-----------------------------------------------------------------------------
+; LED is on PB8 (moved from PB12 which conflicts with TFT RST on PA12
+; – same pin NUMBER 12 causes confusion; keep them on different numbers)
+;-----------------------------------------------------------------------------
+ALARM_LED_PIN   EQU     8       ; PB8
+
 ;=============================================================================
-; Entry
+; Entry point
 ;=============================================================================
 __main
 Main_Entry
-        ; Clear all shared RAM to known defaults.
         BL      Main_InitGlobals
-
-        ; Keep future driver/module init calls centralized here.
         BL      Main_InitCore
-
-        ; Choose the first visible state.
         BL      Main_SetInitialState
-
-        ; Let the UI layer draw the first screen.
-        BL      UI_Update
+        BL      UI_Update               ; first full screen draw
 
 ;=============================================================================
-; Main loop
+; Superloop
 ;=============================================================================
 Main_Loop
-        ; Input polling hook.
-        BL      Main_PollInputs
+        BL      Keypad_Scan             ; fills g_keycode
+        BL      UI_Update               ; redraws screen if state changed
 
-        ; Always-on background work hook.
+        BL      Smoke_Check             ; updates g_smoke_level / g_alarm_flags
+        BL      Main_AlarmTask          ; drives alarm LED from g_alarm_flags
+
         BL      Main_BackgroundTasks
-
-        ; State-based active feature work.
         BL      Main_DispatchByState
-
-        ; Alarm output policy hook.
-        BL      Main_AlarmTask
-
-        ; UI layer decides whether to redraw or partially refresh.
-        BL      UI_Update
 
         B       Main_Loop
 
+
 ;=============================================================================
-; Main_InitGlobals
-; Initialize every shared global to a deterministic boot value.
+; Main_InitGlobals – zero all shared RAM
 ;=============================================================================
 Main_InitGlobals
         PUSH    {LR}
 
-        ; Current state starts cleared.
         LDR     R0, =g_sys_state
         MOVS    R1, #0
         STR     R1, [R0]
 
-        ; Previous state starts cleared too. It will be forced invalid later.
         LDR     R0, =g_prev_state
         MOVS    R1, #0
         STR     R1, [R0]
 
-        ; No active alarms at boot.
         LDR     R0, =g_alarm_flags
         MOVS    R1, #0
         STR     R1, [R0]
 
-        ; No key pressed yet.
         LDR     R0, =g_keycode
         MOVS    R1, #KEY_NONE
         STR     R1, [R0]
 
-        ; Medicine timer starts empty.
         LDR     R0, =g_med_timer
         MOVS    R1, #0
         STR     R1, [R0]
 
-        ; Clear sensor-derived values.
         LDR     R0, =g_smoke_level
         MOVS    R1, #0
         STR     R1, [R0]
@@ -136,72 +147,130 @@ Main_InitGlobals
         MOVS    R1, #0
         STR     R1, [R0]
 
-        ; Motion state starts in stop / idle.
         LDR     R0, =g_motion_state
         MOVS    R1, #MOTION_STOP
         STR     R1, [R0]
 
         POP     {PC}
 
+
 ;=============================================================================
 ; Main_InitCore
-; Single official place for future init calls.
 ;
-; Later this is where you add:
-;   BL GPIO_Init
-;   BL PWM_Init
-;   BL ADC_Init
-;   BL I2C1_Init
-;   BL TFT_Init
-;   BL Keypad_Init
-;   BL Motion_Init
-;   BL SensorsADC_Init
-;   BL MAX30102_Init
+; TFT_Init is self-contained – it calls TFT_GPIO_Init internally which
+; enables GPIOA/GPIOB clocks and configures all TFT pins. Do NOT
+; duplicate that work here.
+;
+; After TFT is up, init the alarm LED, ADC, PWM, and keypad.
 ;=============================================================================
 Main_InitCore
-        BX      LR
+        PUSH    {LR}
+
+        ;------------------------------------------------------------------
+        ; 1. TFT – handles its own GPIO/clock setup internally
+        ;------------------------------------------------------------------
+        BL      TFT_Init
+
+        ;------------------------------------------------------------------
+        ; 2. Alarm LED on PB8
+        ;    GPIOB clock was already enabled by TFT_GPIO_Init (data bus),
+        ;    but calling GPIO_EnableClock again is harmless (it ORRs bits).
+        ;------------------------------------------------------------------
+        LDR     R0, =GPIOB_BASE
+        BL      GPIO_EnableClock
+
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #ALARM_LED_PIN
+        BL      GPIO_ConfigOutput
+
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #ALARM_LED_PIN
+        BL      GPIO_ClearPin           ; LED off at startup
+
+        ;------------------------------------------------------------------
+        ; 3. Smoke sensor ADC on PA1
+        ;------------------------------------------------------------------
+        BL      ADC_Init
+
+        ;------------------------------------------------------------------
+        ; 4. Servo / motor PWM
+        ;------------------------------------------------------------------
+        BL      PWM_Init
+
+        ; Safe startup: center both servos
+        LDR     R0, =1500
+        MOVS    R1, #0
+        BL      PWM_Set_Servo_Pos
+
+        LDR     R0, =1500
+        MOVS    R1, #1
+        BL      PWM_Set_Servo_Pos
+
+        ;------------------------------------------------------------------
+        ; 5. Keypad
+        ;------------------------------------------------------------------
+        BL      Keypad_Init
+
+        POP     {PC}
+
 
 ;=============================================================================
 ; Main_SetInitialState
-; Boot into main menu and force the first UI redraw.
 ;=============================================================================
 Main_SetInitialState
         PUSH    {LR}
 
-        ; First visible state is the main menu.
         LDR     R0, =g_sys_state
         MOVS    R1, #STATE_MAIN_MENU
         STR     R1, [R0]
 
-        ; Force the first UI pass to see a state change.
         LDR     R0, =g_prev_state
         LDR     R1, =STATE_INVALID
         STR     R1, [R0]
 
         POP     {PC}
 
-;=============================================================================
-; Main_PollInputs
-; Placeholder for keypad scan/update logic.
-;=============================================================================
-Main_PollInputs
-        BX      LR
 
 ;=============================================================================
-; Main_BackgroundTasks
-; Placeholder for always-on work like sensing and timer updates.
+; Main_AlarmTask – PB8 LED mirrors Smoke_Alert_Flag
+;=============================================================================
+Main_AlarmTask
+        PUSH    {R2, LR}
+
+        LDR     R0, =g_alarm_flags
+        LDR     R2, [R0]
+
+        TST     R2, #Smoke_Alert_Flag
+        BNE     MAT_LedOn
+
+MAT_LedOff
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #ALARM_LED_PIN
+        BL      GPIO_ClearPin
+        B       MAT_Done
+
+MAT_LedOn
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #ALARM_LED_PIN
+        BL      GPIO_WritePin
+
+MAT_Done
+        POP     {R2, PC}
+
+
+;=============================================================================
+; Main_BackgroundTasks – hook for future sensor polling etc.
 ;=============================================================================
 Main_BackgroundTasks
         BX      LR
 
+
 ;=============================================================================
-; Main_DispatchByState
-; Top-level scheduler/router.
+; Main_DispatchByState – calls active state handler
 ;=============================================================================
 Main_DispatchByState
         PUSH    {LR}
 
-        ; Read the current high-level state.
         LDR     R0, =g_sys_state
         LDR     R0, [R0]
 
@@ -235,7 +304,6 @@ Main_DispatchByState
         CMP     R0, #STATE_MED_WAITING
         BEQ     Dispatch_MedWaiting
 
-        ; Unknown state -> do nothing safely.
         B       Dispatch_Exit
 
 Dispatch_Sanitizing
@@ -265,9 +333,9 @@ Dispatch_MedWaiting
 Dispatch_Exit
         POP     {PC}
 
+
 ;=============================================================================
-; State hook routines
-; Keep them local and empty until the real feature modules are frozen.
+; State hooks – fill these in as features are implemented
 ;=============================================================================
 Main_State_Sanitizing
         BX      LR
@@ -287,12 +355,5 @@ Main_State_MedDispense
 Main_State_MedWaiting
         BX      LR
 
-;=============================================================================
-; Main_AlarmTask
-; Placeholder for physical alarm output behavior.
-; UI already handles alert state routing through g_alarm_flags.
-;=============================================================================
-Main_AlarmTask
-        BX      LR
-
+        ALIGN
         END
