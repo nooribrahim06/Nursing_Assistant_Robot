@@ -2,8 +2,9 @@
 ; ui_state.s
 ; UI State Machine — screen routing, full/partial refresh logic
 ; =============================================================================
-		INCLUDE constants.s
+        INCLUDE constants.s
         AREA    UI_STATE, CODE, READONLY
+        THUMB
 
         EXPORT  UI_Update
 
@@ -22,7 +23,7 @@
         IMPORT  TFT_Render_Breathing
         IMPORT  TFT_Render_Med_Input
         IMPORT  TFT_Render_Med_Alert
-        IMPORT  TFT_Render_Med_Dispense
+        IMPORT  TFT_Render_Med_Despense
         IMPORT  TFT_Render_Smoke_ALERT
         IMPORT  TFT_Update_Smoke_Level
 
@@ -60,36 +61,41 @@ UI_Update FUNCTION
         CMP     R1, R0
         BEQ     UI_Partial_Update
 
-        ; State changed -> save new state and redraw
+        ; State changed -> save new state
         STR     R1, [R5]
+
+        ; Save current state into R4 before BL destroys R0-R3
+        ; FIX: BL TFT_Clear_Screen destroys R1, so we save state in R4 first
+        MOV     R4, R1
         BL      TFT_Clear_Screen
 
-        CMP     R1, #STATE_MAIN_MENU
+        ; Now use R4 (not R1) for all state comparisons
+        CMP     R4, #STATE_MAIN_MENU
         BEQ     UI_Render_Main_Menu
 
-        CMP     R1, #STATE_SANITIZING
+        CMP     R4, #STATE_SANITIZING
         BEQ     UI_Render_Sanitizing
 
-        CMP     R1, #STATE_HEART_RATE
+        CMP     R4, #STATE_HEART_RATE
         BEQ     UI_Render_Heart_Rate
 
-        CMP     R1, #STATE_BREATHING
+        CMP     R4, #STATE_BREATHING
         BEQ     UI_Render_Breathing
 
-        CMP     R1, #STATE_MED_INPUT
+        CMP     R4, #STATE_MED_INPUT
         BEQ     UI_Render_Med_Input
 
-        CMP     R1, #STATE_MED_ALERT
+        CMP     R4, #STATE_MED_ALERT
         BEQ     UI_Render_Med_Alert
 
-        CMP     R1, #STATE_MED_DISPENSE
+        CMP     R4, #STATE_MED_DISPENSE
         BEQ     UI_Render_Med_Dispense
 
-        CMP     R1, #STATE_SMOKE_ALERT
+        CMP     R4, #STATE_SMOKE_ALERT
         BEQ     UI_Render_Smoke_ALERT
 
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -109,7 +115,7 @@ UI_Partial_Update FUNCTION
         BEQ     UI_Update_Smoke_Level
 
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -118,47 +124,47 @@ UI_Partial_Update FUNCTION
 UI_Render_Main_Menu FUNCTION
         BL      TFT_Render_Main_Menu
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Sanitizing FUNCTION
         BL      TFT_Render_Sanitizing
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Heart_Rate FUNCTION
         BL      TFT_Render_Heart_Rate
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Breathing FUNCTION
         BL      TFT_Render_Breathing
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Med_Input FUNCTION
         BL      TFT_Render_Med_Input
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Med_Alert FUNCTION
         BL      TFT_Render_Med_Alert
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Med_Dispense FUNCTION
-        BL      TFT_Render_Med_Dispense
+        BL      TFT_Render_Med_Despense
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Render_Smoke_ALERT FUNCTION
         BL      TFT_Render_Smoke_ALERT
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 UI_Update_Smoke_Level FUNCTION
         BL      TFT_Update_Smoke_Level
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -169,18 +175,20 @@ Handle_Smoke_Alert FUNCTION
         MOV     R1, #STATE_SMOKE_ALERT
         STR     R1, [R0]
         B       UI_Update_Recheck
-	ENDFUNC
+        ENDFUNC
 
 Handle_Med_Alert FUNCTION
         LDR     R0, =g_sys_state
         MOV     R1, #STATE_MED_ALERT
         STR     R1, [R0]
         B       UI_Update_Recheck
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
-; Recheck path after forcing state from alert flags
+; UI_Update_Recheck
+; Called after forcing a state from alert flags.
+; FIX: saves state into R4 before BL TFT_Clear_Screen destroys R1
 ; =============================================================================
 UI_Update_Recheck FUNCTION
         LDR     R4, =g_sys_state
@@ -192,35 +200,39 @@ UI_Update_Recheck FUNCTION
         CMP     R1, R0
         BEQ     UI_Partial_Update
 
+        ; State changed -> save new prev state
         STR     R1, [R5]
+
+        MOV     R4, R1
         BL      TFT_Clear_Screen
 
-        CMP     R1, #STATE_MAIN_MENU
+        ; Use R4 for all comparisons
+        CMP     R4, #STATE_MAIN_MENU
         BEQ     UI_Render_Main_Menu
 
-        CMP     R1, #STATE_SANITIZING
+        CMP     R4, #STATE_SANITIZING
         BEQ     UI_Render_Sanitizing
 
-        CMP     R1, #STATE_HEART_RATE
+        CMP     R4, #STATE_HEART_RATE
         BEQ     UI_Render_Heart_Rate
 
-        CMP     R1, #STATE_BREATHING
+        CMP     R4, #STATE_BREATHING
         BEQ     UI_Render_Breathing
 
-        CMP     R1, #STATE_MED_INPUT
+        CMP     R4, #STATE_MED_INPUT
         BEQ     UI_Render_Med_Input
 
-        CMP     R1, #STATE_MED_ALERT
+        CMP     R4, #STATE_MED_ALERT
         BEQ     UI_Render_Med_Alert
 
-        CMP     R1, #STATE_MED_DISPENSE
+        CMP     R4, #STATE_MED_DISPENSE
         BEQ     UI_Render_Med_Dispense
 
-        CMP     R1, #STATE_SMOKE_ALERT
+        CMP     R4, #STATE_SMOKE_ALERT
         BEQ     UI_Render_Smoke_ALERT
 
         B       UI_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -228,7 +240,7 @@ UI_Update_Recheck FUNCTION
 ; =============================================================================
 UI_EXIT FUNCTION
         POP     {R4, R5, PC}
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -240,11 +252,11 @@ UI_Handle_Input FUNCTION
         LDR     R4, =g_keycode
         LDR     R0, [R4]
 
-		CMP     R0, #KEY_NONE
-		BNE     UIHI_Continue
+        CMP     R0, #KEY_NONE
+		BNE     UI_Handle_Input_Continue
 		B       UI_Handle_Input_EXIT
 
-UIHI_Continue
+UI_Handle_Input_Continue
 
         LDR     R5, =g_sys_state
         LDR     R1, [R5]
@@ -268,7 +280,7 @@ UIHI_Continue
         BEQ     Input_Med_Alert
 
         B       UI_Handle_Input_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -301,7 +313,7 @@ MM_try4
         MOV     R2, #STATE_MED_INPUT
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -313,7 +325,7 @@ Input_Exit_State FUNCTION
         MOV     R2, #STATE_MAIN_MENU
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -403,7 +415,7 @@ MI_d9
         BNE     UI_Handle_Input_EXIT
         MOV     R2, #9
         B       Input_Add_Digit
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -417,7 +429,7 @@ Input_Add_Digit FUNCTION
         ADD     R0, R0, R2
         STR     R0, [R3]
         B       UI_Handle_Input_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -436,7 +448,7 @@ MA_try_C
         MOV     R2, #STATE_MAIN_MENU
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
-	ENDFUNC
+        ENDFUNC
 
 
 ; =============================================================================
@@ -445,8 +457,7 @@ MA_try_C
 UI_Handle_Input_EXIT FUNCTION
         MOV     R2, #KEY_NONE
         STR     R2, [R4]
-
         POP     {R4, R5, PC}
-	ENDFUNC
+        ENDFUNC
 
         END

@@ -1,36 +1,42 @@
-; =====================================================================
-; FILE: globals.s
-; DESCRIPTION: Shared system variables in RAM
-; =====================================================================
+;=============================================================================
+; global.s
+; Shared RAM only
+;=============================================================================
 
         AREA    VARIABLES, DATA, READWRITE
-	EXPORT  g_sys_state
-        EXPORT  g_prev_state
-        EXPORT  g_bpm
-        EXPORT  g_smoke_level
-        EXPORT  g_alarm_flags
-        EXPORT  g_med_timer
-        EXPORT  g_keycode
         ALIGN
 
-; --- System Core Globals ---
-g_sys_state         SPACE   4           ; Current system operation mode
-g_prev_state        SPACE   4           ; Previous mode for UI transitions
-g_alarm_flags       SPACE   4           ; Bitmask for active system alerts[cite: 3]
+        EXPORT  g_sys_state
+        EXPORT  g_prev_state
+        EXPORT  g_alarm_flags
+        EXPORT  g_keycode
+        EXPORT  g_med_timer
+        EXPORT  g_smoke_level
+        EXPORT  g_breath_level
+        EXPORT  g_bpm
+        EXPORT  g_spo2
+        EXPORT  g_hr_red_raw
+        EXPORT  g_hr_ir_raw
+        EXPORT  g_motion_state
 
-; --- Input & UI Globals ---
-g_keycode           SPACE   4           ; Last key pressed on 4x4 matrix[cite: 3]
-g_med_timer         SPACE   4           ; User-defined medicine countdown[cite: 3]
+; --- System core globals ---
+g_sys_state         SPACE   4       ; current top-level state
+g_prev_state        SPACE   4       ; previous state, used to detect redraws
+g_alarm_flags       SPACE   4       ; active alert bits
 
-; --- Sensor Data Globals ---
-g_smoke_level       SPACE   4           ; Processed MQ2 analog value[cite: 3]
-g_breath_level      SPACE   4           ; Processed breathing signal[cite: 3]
-g_bpm               SPACE   4           ; Calculated Heart Rate (BPM)[cite: 3]
-g_spo2              SPACE   4           ; Calculated SpO2 percentage[cite: 3]
-g_hr_red_raw        SPACE   4           ; Raw MAX30102 Red LED data[cite: 3]
-g_hr_ir_raw         SPACE   4           ; Raw MAX30102 IR LED data[cite: 3]
+; --- Input / UI globals ---
+g_keycode           SPACE   4       ; last decoded keypad key
+g_med_timer         SPACE   4       ; medicine timer value
 
-; --- Motion & Actuation Globals ---
-g_motion_state      SPACE   4           ; Current movement direction/status[cite: 3]
+; --- Sensor data globals ---
+g_smoke_level       SPACE   4       ; processed smoke value
+g_breath_level      SPACE   4       ; processed breathing value
+g_bpm               SPACE   4       ; heart rate result
+g_spo2              SPACE   4       ; SpO2 result
+g_hr_red_raw        SPACE   4       ; raw MAX30102 red sample
+g_hr_ir_raw         SPACE   4       ; raw MAX30102 IR sample
+
+; --- Motion / actuation globals ---
+g_motion_state      SPACE   4       ; current motion mode / direction
 
         END
