@@ -3,18 +3,16 @@
 ; DESCRIPTION:
 ;   Low-level TFT driver for ILI9341 using 8080 8-bit parallel interface.
 ;
-; RESPONSIBILITIES:
-;   - Hardware reset
-;   - Command write
-;   - Data write
-;   - 8-bit bus write on PC4..PC11
-;   - WR pulse generation
-;   - 16-bit RGB565 data write
-;   - Address window setup
-;   - Stronger ILI9341 init sequence
+;   Control pins  -> GPIOA
+;       PA2  = RS
+;       PA3  = WR
+;       PA4  = RD
+;       PA5  = CS
+;       PA12 = RST
 ;
-; ASSUMPTION:
-;   GPIO pins were already configured as outputs elsewhere.
+;   Data bus      -> GPIOB  (changed from GPIOC)
+;       PB4..PB10 = D0..D6
+;       PB12      = D7      (PB11 skipped — unavailable)
 ; =====================================================================
 
         AREA    TFT_LOW, CODE, READONLY
@@ -27,22 +25,27 @@
         EXPORT  TFT_WriteData16
         EXPORT  TFT_SetAddressWindow
 
+        IMPORT  GPIO_EnableClock
+        IMPORT  GPIO_ConfigOutput
+
 ; ========================= GPIO BASE =========================
 GPIOA_BASE      EQU     0x40020000
+GPIOB_BASE      EQU     0x40020400
 GPIOC_BASE      EQU     0x40020800
 
 ; ========================= GPIO OFFSETS ======================
 GPIO_ODR        EQU     0x14
 GPIO_BSRR       EQU     0x18
 
-; ========================= TFT CONSTANTS =====================
-TFT_DATA_MASK   EQU     0x00000FF0
-
+; ========================= TFT PIN CONSTANTS =================
 TFT_RS_PIN      EQU     2
 TFT_WR_PIN      EQU     3
 TFT_RD_PIN      EQU     4
 TFT_CS_PIN      EQU     5
 TFT_RST_PIN     EQU     12
+
+; Data bus: PB4..PB10 (D0..D6) + PB12 (D7) — PB11 skipped
+;TFT_DATA_MASK   EQU     0x000017F0      ; bits 4-10 + bit 12
 
 ; ========================= ILI9341 COMMANDS ==================
 ILI9341_SWRESET EQU     0x01
@@ -63,79 +66,101 @@ ILI9341_VMCTR2  EQU     0xC7
 
 
 ; =====================================================================
-; TFT_PinHighA
+; TFT_GPIO_Init
 ; PURPOSE:
-;   Set one control pin on port A HIGH using BSRR.
-; INPUT:
-;   R0 = pin number
+;   Configure every TFT pin as push-pull output.
+;   MUST be called before TFT_Reset or any bus activity.
+;
+;   GPIOA (control pins):
+;       PA2  = RS
+;       PA3  = WR
+;       PA4  = RD
+;       PA5  = CS
+;       PA12 = RST
+;
+;   GPIOB (data bus):                    <-- was GPIOC
+;       PB4..PB10 = D0..D6
+;       PB12      = D7  (PB11 skipped)
+; =====================================================================
+TFT_GPIO_Init FUNCTION
+        PUSH    {R4, LR}
+
+        ; --- ????? Clock ?? GPIOA ? GPIOB ---
+        LDR     R0, =GPIOA_BASE
+        BL      GPIO_EnableClock
+        LDR     R0, =GPIOB_BASE
+        BL      GPIO_EnableClock
+
+        ; --- ????? ?????? ?????? (Control Pins) ?? GPIOA ---
+        LDR     R0, =GPIOA_BASE
+        MOV     R1, #TFT_RS_PIN
+        BL      GPIO_ConfigOutput
+        MOV     R1, #TFT_WR_PIN
+        BL      GPIO_ConfigOutput
+        MOV     R1, #TFT_RD_PIN
+        BL      GPIO_ConfigOutput
+        MOV     R1, #TFT_CS_PIN
+        BL      GPIO_ConfigOutput
+        MOV     R1, #TFT_RST_PIN
+        BL      GPIO_ConfigOutput
+
+        ; --- ????? ?????? ???????? (D0-D7) ?? GPIOB ---
+        LDR     R0, =GPIOB_BASE
+        MOV     R4, #0          ; ???? ?? PB0
+ConfigDataLoop
+        MOV     R1, R4
+        BL      GPIO_ConfigOutput
+        ADD     R4, R4, #1
+        CMP     R4, #8          ; ??? PB7
+        BNE     ConfigDataLoop
+
+        POP     {R4, PC}
+        ENDFUNC
+
+; =====================================================================
+; TFT_PinHighA / TFT_PinLowA
 ; =====================================================================
 TFT_PinHighA FUNCTION
         PUSH    {R1, R2, LR}
-
         LDR     R1, =GPIOA_BASE
         MOVS    R2, #1
         LSLS    R2, R2, R0
         STR     R2, [R1, #GPIO_BSRR]
-
         POP     {R1, R2, LR}
         BX      LR
         ENDFUNC
 
-
-; =====================================================================
-; TFT_PinLowA
-; PURPOSE:
-;   Set one control pin on port A LOW using BSRR.
-; INPUT:
-;   R0 = pin number
-; =====================================================================
 TFT_PinLowA FUNCTION
         PUSH    {R1, R2, LR}
-
         LDR     R1, =GPIOA_BASE
         MOVS    R2, #1
         LSLS    R2, R2, R0
         LSLS    R2, R2, #16
         STR     R2, [R1, #GPIO_BSRR]
-
         POP     {R1, R2, LR}
         BX      LR
         ENDFUNC
 
 
 ; =====================================================================
-; TFT_Delay_Short
-; PURPOSE:
-;   Small timing gap used around WR pulse.
+; TFT_Delay_Short / TFT_Delay_Long
 ; =====================================================================
 TFT_Delay_Short FUNCTION
         PUSH    {R0, LR}
-
         MOVS    R0, #40
-
 TFT_Delay_Short_Loop
         SUBS    R0, R0, #1
         BNE     TFT_Delay_Short_Loop
-
         POP     {R0, LR}
         BX      LR
         ENDFUNC
 
-
-; =====================================================================
-; TFT_Delay_Long
-; PURPOSE:
-;   Longer delay used after reset and sleep-out.
-; =====================================================================
 TFT_Delay_Long FUNCTION
         PUSH    {R0, LR}
-
         LDR     R0, =120000
-
 TFT_Delay_Long_Loop
         SUBS    R0, R0, #1
         BNE     TFT_Delay_Long_Loop
-
         POP     {R0, LR}
         BX      LR
         ENDFUNC
@@ -143,73 +168,69 @@ TFT_Delay_Long_Loop
 
 ; =====================================================================
 ; TFT_WriteBusByte
-; PURPOSE:
-;   Put one 8-bit value on PC4..PC11.
-; INPUT:
-;   R0 = byte to output
+; Put one byte on PB4..PB10 (D0..D6) and PB12 (D7).
+; PB11 is skipped — bits 0-6 shift to GPIO bits 4-10 as before,
+; bit 7 of the byte is placed separately at GPIO bit 12.
+; INPUT: R0 = byte
 ; =====================================================================
 TFT_WriteBusByte FUNCTION
         PUSH    {R1, R2, R3, LR}
-
-        LDR     R1, =GPIOC_BASE
+        LDR     R1, =GPIOB_BASE
+        
+        ; ????? ?????? ??????? ?????
         LDR     R2, [R1, #GPIO_ODR]
-        LDR     R3, =TFT_DATA_MASK
-        BICS    R2, R2, R3
-        AND     R0, R0, #0xFF
-        ORR     R2, R2, R0, LSL #4
+        
+        ; ??? ??? 8 ?? ??? (0-7) ?????? ??? ???? ???? ????????
+        BIC     R2, R2, #0xFF
+        
+        ; ??? ?????? ?????? (R0) ?? ??? 8 ??
+        AND     R3, R0, #0xFF
+        ORR     R2, R2, R3
+        
+        ; ????? ?????? ???????? ?? ?????
         STR     R2, [R1, #GPIO_ODR]
-
+        
         POP     {R1, R2, R3, LR}
         BX      LR
         ENDFUNC
 
-
 ; =====================================================================
 ; TFT_PulseWR
-; PURPOSE:
-;   Generate one WR pulse so the TFT latches the byte.
 ; =====================================================================
 TFT_PulseWR FUNCTION
-        PUSH    {LR}
+        PUSH    {R0, LR}             ; ????? ??? R0 ???? ?????? ???? ??????
 
+        ; 1. ???? ?? ????? ??????? ?????? (Start Pulse)
         MOVS    R0, #TFT_WR_PIN
         BL      TFT_PinLowA
+        
+        ; 2. ????? ???? ??? ??????? ?????? ????? ??? ?????? ????? ??????
         BL      TFT_Delay_Short
-
+        
+        ; 3. ???? ??????? (End Pulse / Latch Data)
         MOVS    R0, #TFT_WR_PIN
         BL      TFT_PinHighA
+        
+        ; 4. ????? ????? ??? ????? ????? ??? ????? ????? ?????? ????? ?????
         BL      TFT_Delay_Short
-
-        POP     {LR}
-        BX      LR
+        
+        POP     {R0, PC}             ; ?????? ?????? ???????? PC
         ENDFUNC
-
-
 ; =====================================================================
 ; TFT_SendCommand
-; PURPOSE:
-;   Send one command byte.
-; INPUT:
-;   R0 = command byte
 ; =====================================================================
 TFT_SendCommand FUNCTION
         PUSH    {R1, LR}
-
         MOV     R1, R0
-
         MOVS    R0, #TFT_RS_PIN
         BL      TFT_PinLowA
-
         MOVS    R0, #TFT_CS_PIN
         BL      TFT_PinLowA
-
         MOV     R0, R1
         BL      TFT_WriteBusByte
         BL      TFT_PulseWR
-
         MOVS    R0, #TFT_CS_PIN
         BL      TFT_PinHighA
-
         POP     {R1, LR}
         BX      LR
         ENDFUNC
@@ -217,29 +238,19 @@ TFT_SendCommand FUNCTION
 
 ; =====================================================================
 ; TFT_SendData
-; PURPOSE:
-;   Send one data byte.
-; INPUT:
-;   R0 = data byte
 ; =====================================================================
 TFT_SendData FUNCTION
         PUSH    {R1, LR}
-
         MOV     R1, R0
-
         MOVS    R0, #TFT_RS_PIN
         BL      TFT_PinHighA
-
         MOVS    R0, #TFT_CS_PIN
         BL      TFT_PinLowA
-
         MOV     R0, R1
         BL      TFT_WriteBusByte
         BL      TFT_PulseWR
-
         MOVS    R0, #TFT_CS_PIN
         BL      TFT_PinHighA
-
         POP     {R1, LR}
         BX      LR
         ENDFUNC
@@ -247,22 +258,15 @@ TFT_SendData FUNCTION
 
 ; =====================================================================
 ; TFT_WriteData16
-; PURPOSE:
-;   Send one 16-bit RGB565 value as two bytes.
-; INPUT:
-;   R0 = 16-bit value
+; INPUT: R0 = 16-bit RGB565
 ; =====================================================================
 TFT_WriteData16 FUNCTION
         PUSH    {R4, LR}
-
         MOV     R4, R0
-
         LSRS    R0, R4, #8
         BL      TFT_SendData
-
         AND     R0, R4, #0xFF
         BL      TFT_SendData
-
         POP     {R4, LR}
         BX      LR
         ENDFUNC
@@ -270,17 +274,10 @@ TFT_WriteData16 FUNCTION
 
 ; =====================================================================
 ; TFT_SetAddressWindow
-; PURPOSE:
-;   Define the rectangular region where upcoming pixel data will go.
-; INPUT:
-;   R0 = x0
-;   R1 = y0
-;   R2 = x1
-;   R3 = y1
+; INPUT: R0=x0, R1=y0, R2=x1, R3=y1
 ; =====================================================================
 TFT_SetAddressWindow FUNCTION
         PUSH    {R4, R5, R6, R7, LR}
-
         MOV     R4, R0
         MOV     R5, R1
         MOV     R6, R2
@@ -318,21 +315,17 @@ TFT_SetAddressWindow FUNCTION
 
 ; =====================================================================
 ; TFT_Reset
-; PURPOSE:
-;   Hardware reset using RST pin.
 ; =====================================================================
 TFT_Reset FUNCTION
         PUSH    {LR}
 
+        ; Idle all control pins HIGH before toggling RST
         MOVS    R0, #TFT_CS_PIN
         BL      TFT_PinHighA
-
         MOVS    R0, #TFT_RD_PIN
         BL      TFT_PinHighA
-
         MOVS    R0, #TFT_WR_PIN
         BL      TFT_PinHighA
-
         MOVS    R0, #TFT_RS_PIN
         BL      TFT_PinHighA
 
@@ -356,11 +349,15 @@ TFT_Reset FUNCTION
 ; =====================================================================
 ; TFT_Init
 ; PURPOSE:
-;   Stronger ILI9341 init sequence than the minimal one.
-;   Still clean and not bloated.
+;   Full ILI9341 bring-up.
+;   Step 1: configure GPIO pins as outputs
+;   Step 2: hardware reset
+;   Step 3: ILI9341 register sequence
 ; =====================================================================
 TFT_Init FUNCTION
         PUSH    {LR}
+
+        BL      TFT_GPIO_Init
 
         BL      TFT_Reset
 
@@ -372,7 +369,6 @@ TFT_Init FUNCTION
         BL      TFT_SendCommand
         BL      TFT_Delay_Long
 
-        ; Frame rate control
         MOVS    R0, #ILI9341_FRMCTR1
         BL      TFT_SendCommand
         MOVS    R0, #0x00
@@ -380,7 +376,6 @@ TFT_Init FUNCTION
         MOVS    R0, #0x18
         BL      TFT_SendData
 
-        ; Display function control
         MOVS    R0, #ILI9341_DFUNCTR
         BL      TFT_SendCommand
         MOVS    R0, #0x08
@@ -390,7 +385,6 @@ TFT_Init FUNCTION
         MOVS    R0, #0x27
         BL      TFT_SendData
 
-        ; Power control
         MOVS    R0, #ILI9341_PWCTR1
         BL      TFT_SendCommand
         MOVS    R0, #0x23
@@ -401,7 +395,6 @@ TFT_Init FUNCTION
         MOVS    R0, #0x10
         BL      TFT_SendData
 
-        ; VCOM control
         MOVS    R0, #ILI9341_VMCTR1
         BL      TFT_SendCommand
         MOVS    R0, #0x3E
@@ -414,19 +407,16 @@ TFT_Init FUNCTION
         MOVS    R0, #0x86
         BL      TFT_SendData
 
-        ; Gamma curve
         MOVS    R0, #ILI9341_GAMSET
         BL      TFT_SendCommand
         MOVS    R0, #0x01
         BL      TFT_SendData
 
-        ; Portrait orientation
         MOVS    R0, #ILI9341_MADCTL
         BL      TFT_SendCommand
         MOVS    R0, #0x48
         BL      TFT_SendData
 
-        ; 16-bit RGB565
         MOVS    R0, #ILI9341_PIXFMT
         BL      TFT_SendCommand
         MOVS    R0, #0x55
