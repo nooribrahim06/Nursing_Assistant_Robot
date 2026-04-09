@@ -62,7 +62,7 @@ GEC_Done
         POP     {R1, R2, R3, PC}
 
 GPIO_ConfigOutput
-        PUSH    {R0,R2, R3, R4, LR}
+        PUSH    {R2, R3, R4, LR}
 
         LDR     R2, [R0, #OFF_GPIO_MODER]
         MOV     R4, R1, LSL #1
@@ -86,7 +86,7 @@ GPIO_ConfigOutput
         BIC     R2, R2, R3
         STR     R2, [R0, #OFF_GPIO_PUPDR]
 
-        POP     {R0,R2, R3, R4, PC}
+        POP     {R2, R3, R4, PC}
 
 GPIO_ConfigInput
         PUSH    {R2, R3, R4, LR}

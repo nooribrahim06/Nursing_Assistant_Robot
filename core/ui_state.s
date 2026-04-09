@@ -11,11 +11,14 @@
         IMPORT  g_sys_state
         IMPORT  g_prev_state
         IMPORT  g_bpm
+        IMPORT  g_spo2
         IMPORT  g_smoke_level
+        IMPORT  g_breath_level
         IMPORT  g_alarm_flags
         IMPORT  g_med_timer
         IMPORT  g_keycode
-
+        IMPORT  g_hr_red_raw
+        IMPORT  g_hr_ir_raw
         IMPORT  TFT_Clear_Screen
         IMPORT  TFT_Render_Main_Menu
         IMPORT  TFT_Render_Sanitizing
@@ -26,6 +29,8 @@
         IMPORT  TFT_Render_Med_Despense
         IMPORT  TFT_Render_Smoke_ALERT
         IMPORT  TFT_Update_Smoke_Level
+        IMPORT  TFT_Update_Breathing_Level
+        IMPORT  TFT_Update_Heart_Values
 
 
 ; =============================================================================
@@ -34,42 +39,31 @@
 UI_Update FUNCTION
         PUSH    {R4, R5, LR}
 
-        ; -- Flag Handling (Highest Priority) --
         LDR     R0, =g_alarm_flags
         LDR     R1, [R0]
 
-        ; Check Smoke Alert Flag
         TST     R1, #Smoke_Alert_Flag
         BNE     Handle_Smoke_Alert
 
-        ; Check Med Alert Flag
         TST     R1, #Med_Alert_Flag
         BNE     Handle_Med_Alert
 
-        ; Handle keypad input
         BL      UI_Handle_Input
 
-        ; Read current state
         LDR     R4, =g_sys_state
         LDR     R1, [R4]
 
-        ; Read previous state
         LDR     R5, =g_prev_state
         LDR     R0, [R5]
 
-        ; Compare states
         CMP     R1, R0
         BEQ     UI_Partial_Update
 
-        ; State changed -> save new state
         STR     R1, [R5]
 
-        ; Save current state into R4 before BL destroys R0-R3
-        ; FIX: BL TFT_Clear_Screen destroys R1, so we save state in R4 first
         MOV     R4, R1
         BL      TFT_Clear_Screen
 
-        ; Now use R4 (not R1) for all state comparisons
         CMP     R4, #STATE_MAIN_MENU
         BEQ     UI_Render_Main_Menu
 
@@ -105,18 +99,46 @@ UI_Partial_Update FUNCTION
         LDR     R4, =g_sys_state
         LDR     R1, [R4]
 
-        LDR     R3, =g_smoke_level
-        LDR     R2, [R3]
-
         CMP     R1, #STATE_MAIN_MENU
-        BEQ     UI_Update_Smoke_Level
+        BEQ     UI_Load_Smoke_Level
 
         CMP     R1, #STATE_SMOKE_ALERT
-        BEQ     UI_Update_Smoke_Level
+        BEQ     UI_Load_Smoke_Level
+
+        CMP     R1, #STATE_BREATHING
+        BEQ     UI_Load_Breath_Level
+
+        CMP     R1, #STATE_HEART_RATE
+        BEQ     UI_Load_Heart_Values
 
         B       UI_EXIT
         ENDFUNC
 
+
+UI_Load_Smoke_Level FUNCTION
+        LDR     R3, =g_smoke_level
+        LDR     R2, [R3]
+        BL      TFT_Update_Smoke_Level
+        B       UI_EXIT
+        ENDFUNC
+
+UI_Load_Breath_Level FUNCTION
+        LDR     R3, =g_breath_level
+        LDR     R2, [R3]
+        BL      TFT_Update_Breathing_Level
+        B       UI_EXIT
+        ENDFUNC
+
+UI_Load_Heart_Values FUNCTION
+        LDR     R0, =g_bpm
+        LDR     R2, [R0]
+
+        LDR     R0, =g_spo2
+        LDR     R3, [R0]
+
+        BL      TFT_Update_Heart_Values
+        B       UI_EXIT
+        ENDFUNC
 
 ; =============================================================================
 ; Render Functions
@@ -161,11 +183,6 @@ UI_Render_Smoke_ALERT FUNCTION
         B       UI_EXIT
         ENDFUNC
 
-UI_Update_Smoke_Level FUNCTION
-        BL      TFT_Update_Smoke_Level
-        B       UI_EXIT
-        ENDFUNC
-
 
 ; =============================================================================
 ; Alert Handlers
@@ -187,8 +204,6 @@ Handle_Med_Alert FUNCTION
 
 ; =============================================================================
 ; UI_Update_Recheck
-; Called after forcing a state from alert flags.
-; FIX: saves state into R4 before BL TFT_Clear_Screen destroys R1
 ; =============================================================================
 UI_Update_Recheck FUNCTION
         LDR     R4, =g_sys_state
@@ -200,13 +215,11 @@ UI_Update_Recheck FUNCTION
         CMP     R1, R0
         BEQ     UI_Partial_Update
 
-        ; State changed -> save new prev state
         STR     R1, [R5]
 
         MOV     R4, R1
         BL      TFT_Clear_Screen
 
-        ; Use R4 for all comparisons
         CMP     R4, #STATE_MAIN_MENU
         BEQ     UI_Render_Main_Menu
 
@@ -253,8 +266,8 @@ UI_Handle_Input FUNCTION
         LDR     R0, [R4]
 
         CMP     R0, #KEY_NONE
-		BNE     UI_Handle_Input_Continue
-		B       UI_Handle_Input_EXIT
+        BNE     UI_Handle_Input_Continue
+        B       UI_Handle_Input_EXIT
 
 UI_Handle_Input_Continue
 
