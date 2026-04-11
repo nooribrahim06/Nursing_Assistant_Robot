@@ -200,7 +200,7 @@ KEY_D               EQU     16
 ;-----------------------------------------------------------------------------
 Smoke_Alert_Flag    EQU     0x00000001
 Med_Alert_Flag      EQU     0x00000002
-
+SMOKE_IGNORE_ITERATIONS    EQU     200
 ;-----------------------------------------------------------------------------
 ; System states
 ;-----------------------------------------------------------------------------
@@ -214,6 +214,12 @@ STATE_MED_INPUT     EQU     6
 STATE_MED_DISPENSE  EQU     7
 STATE_SMOKE_ALERT   EQU     8
 STATE_MED_WAITING   EQU     9
+SYST_CSR        EQU     0xE000E010
+SYST_RVR        EQU     0xE000E014
+SYST_CVR        EQU     0xE000E018
 
+SYST_ENABLE     EQU     0x00000001
+SYST_TICKINT    EQU     0x00000002
+SYST_CLKSRC     EQU     0x00000004
 STATE_INVALID       EQU     0xFFFFFFFF
 	 END

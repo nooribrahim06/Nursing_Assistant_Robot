@@ -30,13 +30,15 @@
         EXPORT  TFT_Draw_Rect
         EXPORT  TFT_Fill_Rect
         EXPORT  TFT_Draw_String
-
+		EXPORT  TFT_Draw_Number6
         IMPORT  g_hr_red_raw
         IMPORT  g_hr_ir_raw
         IMPORT  g_bpm
         IMPORT  g_spo2
         IMPORT  TFT_SetAddressWindow
         IMPORT  TFT_WriteData16
+	    IMPORT  g_med_timer
+			
 
 TFT_WIDTH           EQU     240
 TFT_HEIGHT          EQU     320
@@ -321,19 +323,17 @@ Draw_String_Done
 TFT_Draw_Number3
         PUSH    {R4-R9, LR}
 
-        MOV     R4, R0          ; x
-        MOV     R5, R1          ; y
-        MOV     R6, R2          ; value
-        MOV     R7, R3          ; color
+        MOV     R4, R0
+        MOV     R5, R1
+        MOV     R6, R2
+        MOV     R7, R3
 
-        ; clamp to 999
         LDR     R0, =999
         CMP     R6, R0
         BLS     Num3_ClampDone
         MOV     R6, R0
 
 Num3_ClampDone
-        ; hundreds -> R8
         MOVS    R8, #0
 Num3_Hundreds
         CMP     R6, #100
@@ -343,7 +343,6 @@ Num3_Hundreds
         B       Num3_Hundreds
 
 Num3_HundredsDone
-        ; tens -> R9
         MOVS    R9, #0
 Num3_Tens
         CMP     R6, #10
@@ -353,16 +352,12 @@ Num3_Tens
         B       Num3_Tens
 
 Num3_TensDone
-        ; units now in R6
-
-        ; draw hundreds
         MOV     R0, R4
         MOV     R1, R5
         ADDS    R2, R8, #'0'
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw tens
         MOV     R0, R4
         ADDS    R0, R0, #CHAR_ADVANCE
         MOV     R1, R5
@@ -370,7 +365,6 @@ Num3_TensDone
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw units
         MOV     R0, R4
         ADDS    R0, R0, #(CHAR_ADVANCE * 2)
         MOV     R1, R5
@@ -383,19 +377,17 @@ Num3_TensDone
 TFT_Draw_Number6
         PUSH    {R4-R11, LR}
 
-        MOV     R4, R0          ; x
-        MOV     R5, R1          ; y
-        MOV     R6, R2          ; value
-        MOV     R7, R3          ; color
+        MOV     R4, R0
+        MOV     R5, R1
+        MOV     R6, R2
+        MOV     R7, R3
 
-        ; clamp to 262143 (18-bit max)
         LDR     R0, =262143
         CMP     R6, R0
         BLS     Num6_ClampDone
         MOV     R6, R0
 
 Num6_ClampDone
-        ; digit1 = hundred-thousands
         MOVS    R8, #0
 Num6_D1
         LDR     R0, =100000
@@ -406,7 +398,6 @@ Num6_D1
         B       Num6_D1
 Num6_D1Done
 
-        ; digit2 = ten-thousands
         MOVS    R9, #0
 Num6_D2
         LDR     R0, =10000
@@ -417,7 +408,6 @@ Num6_D2
         B       Num6_D2
 Num6_D2Done
 
-        ; digit3 = thousands
         MOVS    R10, #0
 Num6_D3
         LDR     R0, =1000
@@ -428,7 +418,6 @@ Num6_D3
         B       Num6_D3
 Num6_D3Done
 
-        ; digit4 = hundreds
         MOVS    R11, #0
 Num6_D4
         MOVS    R0, #100
@@ -439,7 +428,6 @@ Num6_D4
         B       Num6_D4
 Num6_D4Done
 
-        ; digit5 = tens
         MOVS    R12, #0
 Num6_D5
         MOVS    R0, #10
@@ -449,16 +437,13 @@ Num6_D5
         ADDS    R12, R12, #1
         B       Num6_D5
 Num6_D5Done
-        ; digit6 = units in R6
 
-        ; draw digit1
         MOV     R0, R4
         MOV     R1, R5
         ADDS    R2, R8, #'0'
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw digit2
         MOV     R0, R4
         ADDS    R0, R0, #6
         MOV     R1, R5
@@ -466,7 +451,6 @@ Num6_D5Done
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw digit3
         MOV     R0, R4
         ADDS    R0, R0, #12
         MOV     R1, R5
@@ -474,7 +458,6 @@ Num6_D5Done
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw digit4
         MOV     R0, R4
         ADDS    R0, R0, #18
         MOV     R1, R5
@@ -482,7 +465,6 @@ Num6_D5Done
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw digit5
         MOV     R0, R4
         ADDS    R0, R0, #24
         MOV     R1, R5
@@ -490,7 +472,6 @@ Num6_D5Done
         MOV     R3, R7
         BL      GFX_Draw_Char
 
-        ; draw digit6
         MOV     R0, R4
         ADDS    R0, R0, #30
         MOV     R1, R5
@@ -801,6 +782,21 @@ TFT_Render_Med_Input
         LDR     R3, =COLOR_WHITE
         BL      TFT_Draw_String
 
+        ; ---- DEBUG LABEL ----
+        MOVS    R0, #40
+        MOVS    R1, #185
+        LDR     R2, =StrTimerDbg
+        LDR     R3, =COLOR_WHITE
+        BL      TFT_Draw_String
+
+        ; ---- DEBUG VALUE: g_med_timer ----
+        LDR     R2, =g_med_timer
+        LDR     R2, [R2]
+        MOVS    R0, #95
+        MOVS    R1, #185
+        LDR     R3, =COLOR_WHITE
+        BL      TFT_Draw_Number6
+
         POP     {R4, PC}
 
 TFT_Render_Med_Waiting
@@ -836,7 +832,7 @@ TFT_Render_Med_Alert
         LDR     R3, =110
         BL      TFT_Draw_Rect
 
-        MOVS    R0, #65
+        MOVS    R0, #40
         MOVS    R1, #130
         LDR     R2, =StrMedAlertBody
         LDR     R3, =COLOR_WHITE
@@ -944,10 +940,9 @@ Smoke_Done
 TFT_Update_Heart_Values
         PUSH    {R4-R7, LR}
 
-        MOV     R6, R2                  ; BPM
-        MOV     R7, R3                  ; SpO2
+        MOV     R6, R2
+        MOV     R7, R3
 
-        ; clear BPM number area
         LDR     R4, =COLOR_BLACK
         MOVS    R0, #85
         MOVS    R1, #120
@@ -955,27 +950,30 @@ TFT_Update_Heart_Values
         MOVS    R3, #8
         BL      TFT_Fill_Rect
 
-        ; clear SpO2 number area
         LDR     R4, =COLOR_BLACK
         MOVS    R0, #85
         MOVS    R1, #150
-        MOVS    R2, #40
+        MOVS    R2, #52
         MOVS    R3, #8
         BL      TFT_Fill_Rect
 
-        ; draw BPM value
         MOVS    R0, #85
         MOVS    R1, #120
         MOV     R2, R6
         LDR     R3, =COLOR_WHITE
         BL      TFT_Draw_Number3
 
-        ; draw SpO2 value
         MOVS    R0, #85
         MOVS    R1, #150
         MOV     R2, R7
         LDR     R3, =COLOR_WHITE
         BL      TFT_Draw_Number3
+
+        MOVS    R0, #103
+        MOVS    R1, #150
+        MOVS    R2, #'%'
+        LDR     R3, =COLOR_WHITE
+        BL      GFX_Draw_Char
 
         POP     {R4-R7, PC}
 
@@ -1066,14 +1064,14 @@ StrMedInput3        DCB "C BACK",0
 
 StrWaiting          DCB "WAITING",0
 StrMedAlertHeader   DCB "MED ALERT",0
-StrMedAlertBody     DCB "PRESS A",0
+StrMedAlertBody     DCB "A OK  C BACK",0
 StrDispense         DCB "DISPENSING",0
 
 StrSmokeAlert       DCB "SMOKE ALERT",0
 StrSmokeDanger      DCB "DANGER",0
 
 StrExitD            DCB "D EXIT",0
-
+StrTimerDbg         DCB "TIMER",0
         ALIGN
 
 GlyphSpace          DCB 0x00,0x00,0x00,0x00,0x00

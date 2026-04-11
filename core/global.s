@@ -30,16 +30,23 @@
         EXPORT  g_hr_red_max
         EXPORT  g_hr_ir_min
         EXPORT  g_hr_ir_max
-
+		EXPORT  g_warmup_cnt
+        EXPORT  g_snooze_cnt
+		EXPORT g_smoke_ignore_counter	
+		EXPORT 	g_med_wait_ui
+		EXPORT 	g_ms_ticks  			
+		EXPORT 	g_last_med_tick 
 ; --- System core globals ---
 g_sys_state             SPACE   4       ; current top-level state
 g_prev_state            SPACE   4       ; previous state, used to detect redraws
 g_alarm_flags           SPACE   4       ; active alert bits
-
+g_smoke_ignore_counter  SPACE  4
 ; --- Input / UI globals ---
 g_keycode               SPACE   4       ; last decoded keypad key
 g_med_timer             SPACE   4       ; medicine timer value
-
+g_med_wait_ui            SPACE   4       ; short waiting-screen counter
+g_ms_ticks               SPACE   4       ; increments every 1 ms
+g_last_med_tick          SPACE   4       ; last second boundary for med timer
 ; --- Sensor data globals ---
 g_smoke_level           SPACE   4       ; processed smoke value
 g_breath_level          SPACE   4       ; processed breathing value
@@ -59,7 +66,8 @@ g_hr_red_min            SPACE   4       ; window red minimum
 g_hr_red_max            SPACE   4       ; window red maximum
 g_hr_ir_min             SPACE   4       ; window IR minimum
 g_hr_ir_max             SPACE   4       ; window IR maximum
-
+g_warmup_cnt      	 	SPACE 4
+g_snooze_cnt       		SPACE 4
 ; --- Motion / actuation globals ---
 g_motion_state          SPACE   4       ; current motion mode / direction
 

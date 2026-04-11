@@ -25,29 +25,56 @@
         IMPORT  TFT_Render_Heart_Rate
         IMPORT  TFT_Render_Breathing
         IMPORT  TFT_Render_Med_Input
+        IMPORT  TFT_Render_Med_Waiting
         IMPORT  TFT_Render_Med_Alert
         IMPORT  TFT_Render_Med_Despense
         IMPORT  TFT_Render_Smoke_ALERT
         IMPORT  TFT_Update_Smoke_Level
         IMPORT  TFT_Update_Breathing_Level
         IMPORT  TFT_Update_Heart_Values
-
-
+        IMPORT  g_smoke_ignore_counter
+        IMPORT  g_med_wait_ui
+		IMPORT TFT_Draw_Number6
+		IMPORT  TFT_Fill_Rect
+COLOR_BLACK         EQU     0x0000
+COLOR_WHITE         EQU     0xFFFF
 ; =============================================================================
 ; UI_Update
+; MED ALERT gets priority
 ; =============================================================================
 UI_Update FUNCTION
         PUSH    {R4, R5, LR}
-
+		LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        CMP     R1, #STATE_MED_DISPENSE ; ??? ??? ?? ???? ?????? ?? ???????
+        BEQ     UI_Handle_Input_Then_Route
         LDR     R0, =g_alarm_flags
         LDR     R1, [R0]
 
-        TST     R1, #Smoke_Alert_Flag
-        BNE     Handle_Smoke_Alert
-
+        ; MED ALERT first
         TST     R1, #Med_Alert_Flag
         BNE     Handle_Med_Alert
 
+        ; then smoke alert
+        TST     R1, #Smoke_Alert_Flag
+        BEQ     UI_Handle_Input_Then_Route
+
+        LDR     R4, =g_smoke_ignore_counter
+        LDR     R5, [R4]
+        CMP     R5, #0
+        BEQ     UI_Trigger_Smoke_Alert
+
+        SUBS    R5, R5, #1
+        STR     R5, [R4]
+        B       UI_Handle_Input_Then_Route
+
+UI_Trigger_Smoke_Alert
+        LDR     R0, =g_sys_state
+        MOV     R1, #STATE_SMOKE_ALERT
+        STR     R1, [R0]
+        B       UI_Handle_Input_Then_Route
+
+UI_Handle_Input_Then_Route
         BL      UI_Handle_Input
 
         LDR     R4, =g_sys_state
@@ -79,6 +106,9 @@ UI_Update FUNCTION
         CMP     R4, #STATE_MED_INPUT
         BEQ     UI_Render_Med_Input
 
+        CMP     R4, #STATE_MED_WAITING
+        BEQ     UI_Render_Med_Waiting
+
         CMP     R4, #STATE_MED_ALERT
         BEQ     UI_Render_Med_Alert
 
@@ -90,7 +120,6 @@ UI_Update FUNCTION
 
         B       UI_EXIT
         ENDFUNC
-
 
 ; =============================================================================
 ; UI_Partial_Update
@@ -111,9 +140,10 @@ UI_Partial_Update FUNCTION
         CMP     R1, #STATE_HEART_RATE
         BEQ     UI_Load_Heart_Values
 
+		CMP     R1, #STATE_MED_INPUT
+        BEQ     UI_Update_Med_Number
         B       UI_EXIT
         ENDFUNC
-
 
 UI_Load_Smoke_Level FUNCTION
         LDR     R3, =g_smoke_level
@@ -183,6 +213,10 @@ UI_Render_Smoke_ALERT FUNCTION
         B       UI_EXIT
         ENDFUNC
 
+UI_Render_Med_Waiting FUNCTION
+        BL      TFT_Render_Med_Waiting
+        B       UI_EXIT
+        ENDFUNC
 
 ; =============================================================================
 ; Alert Handlers
@@ -198,9 +232,8 @@ Handle_Med_Alert FUNCTION
         LDR     R0, =g_sys_state
         MOV     R1, #STATE_MED_ALERT
         STR     R1, [R0]
-        B       UI_Update_Recheck
+        B       UI_Handle_Input_Then_Route
         ENDFUNC
-
 
 ; =============================================================================
 ; UI_Update_Recheck
@@ -235,6 +268,9 @@ UI_Update_Recheck FUNCTION
         CMP     R4, #STATE_MED_INPUT
         BEQ     UI_Render_Med_Input
 
+        CMP     R4, #STATE_MED_WAITING
+        BEQ     UI_Render_Med_Waiting
+
         CMP     R4, #STATE_MED_ALERT
         BEQ     UI_Render_Med_Alert
 
@@ -246,15 +282,29 @@ UI_Update_Recheck FUNCTION
 
         B       UI_EXIT
         ENDFUNC
+UI_Update_Med_Number
+        ; ??? ???????? ?????? ?????? ??? ????? ?????
+        LDR     R4, =COLOR_BLACK
+        MOVS    R0, #95
+        MOVS    R1, #185
+        MOVS    R2, #40
+        MOVS    R3, #8
+        BL      TFT_Fill_Rect
 
-
+        ; ??? ????? ??????
+        LDR     R2, =g_med_timer
+        LDR     R2, [R2]
+        MOVS    R0, #95
+        MOVS    R1, #185
+        LDR     R3, =COLOR_WHITE
+        BL      TFT_Draw_Number6
+        B       UI_EXIT
 ; =============================================================================
 ; UI_EXIT
 ; =============================================================================
 UI_EXIT FUNCTION
         POP     {R4, R5, PC}
         ENDFUNC
-
 
 ; =============================================================================
 ; UI_Handle_Input
@@ -267,7 +317,7 @@ UI_Handle_Input FUNCTION
 
         CMP     R0, #KEY_NONE
         BNE     UI_Handle_Input_Continue
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 UI_Handle_Input_Continue
 
@@ -275,26 +325,28 @@ UI_Handle_Input_Continue
         LDR     R1, [R5]
 
         CMP     R1, #STATE_MAIN_MENU
-        BEQ     Input_Main_Menu
+        BEQ.W   Input_Main_Menu
 
         CMP     R1, #STATE_SANITIZING
-        BEQ     Input_Exit_State
+        BEQ.W   Input_Exit_State
 
         CMP     R1, #STATE_HEART_RATE
-        BEQ     Input_Exit_State
+        BEQ.W   Input_Exit_State
 
         CMP     R1, #STATE_BREATHING
-        BEQ     Input_Exit_State
+        BEQ.W   Input_Exit_State
 
         CMP     R1, #STATE_MED_INPUT
-        BEQ     Input_Med_Input
+        BEQ.W   Input_Med_Input
 
         CMP     R1, #STATE_MED_ALERT
-        BEQ     Input_Med_Alert
+        BEQ.W   Input_Med_Alert
 
-        B       UI_Handle_Input_EXIT
+        CMP     R1, #STATE_SMOKE_ALERT
+        BEQ.W   Input_Smoke_Alert
+
+        B.W     UI_Handle_Input_EXIT
         ENDFUNC
-
 
 ; =============================================================================
 ; Input_Main_Menu
@@ -304,70 +356,113 @@ Input_Main_Menu FUNCTION
         BNE     MM_try2
         MOV     R2, #STATE_SANITIZING
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MM_try2
         CMP     R0, #KEY_2
         BNE     MM_try3
         MOV     R2, #STATE_HEART_RATE
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MM_try3
         CMP     R0, #KEY_3
         BNE     MM_try4
         MOV     R2, #STATE_BREATHING
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MM_try4
-        CMP     R0, #KEY_4
-        BNE     UI_Handle_Input_EXIT
-        MOV     R2, #STATE_MED_INPUT
-        STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
-        ENDFUNC
+    CMP     R0, #KEY_4
+    BNE.W   UI_Handle_Input_EXIT
+    MOV     R2, #STATE_MED_INPUT
+    STR     R2, [R5]
 
+    ; ????? ?????? ???
+    LDR     R2, =g_med_timer
+    MOVS    R3, #0
+    STR     R3, [R2]
 
+    B.W     UI_Handle_Input_EXIT
+		ENDFUNC
 ; =============================================================================
 ; Input_Exit_State
 ; =============================================================================
 Input_Exit_State FUNCTION
         CMP     R0, #KEY_D
-        BNE     UI_Handle_Input_EXIT
+        BNE.W   UI_Handle_Input_EXIT
         MOV     R2, #STATE_MAIN_MENU
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
         ENDFUNC
 
+; =============================================================================
+; Input_Smoke_Alert
+; =============================================================================
+Input_Smoke_Alert FUNCTION
+        CMP     R0, #KEY_D
+        BNE.W    UI_Handle_Input_EXIT
+
+        MOV     R2, #STATE_MAIN_MENU
+        STR     R2, [R5]
+
+        LDR     R2, =g_smoke_ignore_counter
+        LDR     R3, =SMOKE_IGNORE_ITERATIONS
+        STR     R3, [R2]
+
+        LDR     R2, =g_alarm_flags
+        LDR     R3, [R2]
+        BIC     R3, R3, #Smoke_Alert_Flag
+        STR     R3, [R2]
+
+        B.W     UI_Handle_Input_EXIT
+        ENDFUNC
 
 ; =============================================================================
 ; Input_Med_Input
 ; =============================================================================
 Input_Med_Input FUNCTION
         CMP     R0, #KEY_A
-        BNE     MI_try_B
+        BNE.W   MI_try_B
+
+        ; confirm only if timer != 0
+        LDR     R2, =g_med_timer
+        LDR     R3, [R2]
+        CMP     R3, #0
+        BEQ.W   UI_Handle_Input_EXIT
+
+        ; clear stale med alert flag
+        LDR     R2, =g_alarm_flags
+        LDR     R3, [R2]
+        BIC     R3, R3, #Med_Alert_Flag
+        STR     R3, [R2]
+
+        ; short waiting screen
+        LDR     R2, =g_med_wait_ui
+        LDR     R3, =20
+        STR     R3, [R2]
+
         MOV     R2, #STATE_MED_WAITING
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MI_try_B
         CMP     R0, #KEY_B
-        BNE     MI_try_C
+        BNE.W   MI_try_C
         LDR     R2, =g_med_timer
         MOV     R3, #0
         STR     R3, [R2]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MI_try_C
         CMP     R0, #KEY_C
-        BNE     MI_try_digits
+        BNE.W   MI_try_digits
         LDR     R2, =g_med_timer
         MOV     R3, #0
         STR     R3, [R2]
         MOV     R2, #STATE_MAIN_MENU
         STR     R2, [R5]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
 
 MI_try_digits
         CMP     R0, #KEY_0
@@ -425,11 +520,10 @@ MI_d8
 
 MI_d9
         CMP     R0, #KEY_9
-        BNE     UI_Handle_Input_EXIT
+        BNE.W   UI_Handle_Input_EXIT
         MOV     R2, #9
-        B       Input_Add_Digit
+        B.W     Input_Add_Digit
         ENDFUNC
-
 
 ; =============================================================================
 ; Input_Add_Digit
@@ -441,16 +535,18 @@ Input_Add_Digit FUNCTION
         MUL     R0, R1, R0
         ADD     R0, R0, R2
         STR     R0, [R3]
-        B       UI_Handle_Input_EXIT
+        B.W     UI_Handle_Input_EXIT
         ENDFUNC
-
 
 ; =============================================================================
 ; Input_Med_Alert
 ; =============================================================================
+; ?? ??? ui_state.s
 Input_Med_Alert FUNCTION
         CMP     R0, #KEY_A
         BNE     MA_try_C
+
+        ; ??? ??? A: ???? ?????
         MOV     R2, #STATE_MED_DISPENSE
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
@@ -458,11 +554,17 @@ Input_Med_Alert FUNCTION
 MA_try_C
         CMP     R0, #KEY_C
         BNE     UI_Handle_Input_EXIT
+
+        ; ??? ??? C: ???? ?????? ???? ???????
+        LDR     R2, =g_alarm_flags
+        LDR     R3, [R2]
+        BIC     R3, R3, #Med_Alert_Flag
+        STR     R3, [R2]
+
         MOV     R2, #STATE_MAIN_MENU
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
         ENDFUNC
-
 
 ; =============================================================================
 ; UI_Handle_Input_EXIT
