@@ -31,137 +31,178 @@
 ; ---------------------------------------------------------------------
 MOT_Init
         PUSH    {LR}
-
-        ; Enable clocks for required ports.
+        
+        ; 1. Enable clocks for required ports (mandatory before configuration) 
         LDR     R0, =GPIOA_BASE
         BL      GPIO_EnableClock
         LDR     R0, =GPIOB_BASE
         BL      GPIO_EnableClock
         LDR     R0, =GPIOC_BASE
         BL      GPIO_EnableClock
-
-        ; Configure PA8..PA11 as motor direction outputs.
+        
+        ; 2. Configure motor direction pins (PA8-PA11) as outputs
         LDR     R0, =GPIOA_BASE
-        MOVS    R1, #MOT_IN1
+        MOV     R1, #MOT_IN1
         BL      GPIO_ConfigOutput
-        MOVS    R1, #MOT_IN2
+        MOV     R1, #MOT_IN2
         BL      GPIO_ConfigOutput
-        MOVS    R1, #MOT_IN3
+        MOV     R1, #MOT_IN3
         BL      GPIO_ConfigOutput
-        MOVS    R1, #MOT_IN4
+        MOV     R1, #MOT_IN4
         BL      GPIO_ConfigOutput
-
-        ; Configure PC0..PC2 as line tracker inputs.
-        LDR     R0, =GPIOC_BASE
-        MOVS    R1, #LINE_LEFT
+        
+        ; 3. Configure line tracking sensor pins (PC0-PC2) as inputs
+        LDR     R0, =GPIOB_BASE
+        MOV     R1, #LINE_LEFT
         BL      GPIO_ConfigInput
-        MOVS    R1, #LINE_CENTER
+        MOV     R1, #LINE_CENTER
         BL      GPIO_ConfigInput
-        MOVS    R1, #LINE_RIGHT
+        MOV     R1, #LINE_RIGHT
         BL      GPIO_ConfigInput
-
-        ; Initialize PWM outputs.
-        BL      PWM_Init
-
+        
+        ; 4. Initialize PWM for speed control
+        BL      PWM_Init 
+        
         POP     {PC}
 
 ; ---------------------------------------------------------------------
-; MOT_Update
-; Main line-following logic.
+; Subroutine: MOT_Update
+; Purpose: Main logic loop for line following (Embedded Legacy Logic)
+; ---------------------------------------------------------------------
+; ---------------------------------------------------------------------
+; Subroutine: MOT_Update
+; Purpose: Main logic loop for line following (Embedded Legacy Logic)
 ; ---------------------------------------------------------------------
 MOT_Update
-        PUSH    {R4-R6, LR}
+        PUSH    {R4-R7, LR}     ; Save protected registers
 
-        ; Read left sensor.
-        LDR     R0, =GPIOC_BASE
-        MOVS    R1, #LINE_LEFT
+        ; 1. Read Left Sensor (PC0) and shift it to Bit 2 (100)
+        LDR     R0, =GPIOB_BASE
+        MOV     R1, #LINE_LEFT
         BL      GPIO_ReadPin
-        MOV     R4, R0
+        LSL     R4, R0, #2      
 
-        ; Read center sensor.
-        MOVS    R1, #LINE_CENTER
+        ; 2. Read Center Sensor (PC1) and shift it to Bit 1 (010)
+        LDR     R0, =GPIOB_BASE     ; <--- THE VISION FIX
+        MOV     R1, #LINE_CENTER
         BL      GPIO_ReadPin
-        MOV     R5, R0
+        LSL     R5, R0, #1      
 
-        ; Read right sensor.
-        MOVS    R1, #LINE_RIGHT
+        ; 3. Read Right Sensor (PC2) at Bit 0 (001)
+        LDR     R0, =GPIOB_BASE     ; <--- THE VISION FIX
+        MOV     R1, #LINE_RIGHT
         BL      GPIO_ReadPin
-        MOV     R6, R0
+        MOV     R6, R0          
 
-        ; Priority: center, then left, then right, else stop.
-        CMP     R5, #1
-        BEQ     Action_Forward
+        ; 4. Combine them into a single 3-bit mask in R7
+        ORR     R7, R4, R5
+        ORR     R7, R7, R6
+        
+        ; 5. Invert the bits (Active-Low to Active-High)
+        EOR     R7, R7, #0x07
 
-        CMP     R4, #1
-        BEQ     Action_Turn_Left
+        ; ==========================================
+        ; The 8-State Legacy Decision Tree
+        ; ==========================================
+        CMP     R7, #0x02       ; STRAIGHT_FORWARD (010)
+        BEQ     Action_Straight
 
-        CMP     R6, #1
-        BEQ     Action_Turn_Right
+        CMP     R7, #0x07       ; SEARCH_STRAIGHT (111)
+        BEQ     Action_Search
 
-        B       Action_Stop
+        CMP     R7, #0x06       ; SLIGHT_LEFT (110)
+        BEQ     Action_Slight_Left 
 
-Action_Forward
+        CMP     R7, #0x04       ; SHARP_LEFT (100)
+        BEQ     Action_Sharp_Left
+
+        CMP     R7, #0x03       ; SLIGHT_RIGHT (011)
+        BEQ     Action_Slight_Right 
+
+        CMP     R7, #0x01       ; SHARP_RIGHT (001)
+        BEQ     Action_Sharp_Right
+
+        CMP     R7, #0x05       ; SEARCH_RIGHT (101)
+        BEQ     Action_Sharp_Right
+
+        CMP     R7, #0x00       ; SEARCH (000 - Lost Line)
+        BEQ     Action_Search
+
+        B       Action_Search   ; Fallback safety
+
+; ==========================================
+; Movement Execution
+; Recall: R0 = Right Speed, R1 = Left Speed
+; ==========================================
+Action_Straight
         BL      Set_Dir_Forward
-        LDR     R2, =g_motion_state
-        MOVS    R3, #1
-        STR     R3, [R2]
-
-        LDR     R0, =800
-        LDR     R1, =800
+        MOV     R0, #700        ; <-- Change to 700 to test torque
+        MOV     R1, #700        ; <-- Change to 700 to test torque
+        BL      PWM_Set_Motor_Speed
+        B       End_Update
+Action_Slight_Left
+        BL      Set_Dir_Forward
+        MOV     R0, #499        ; Right = HALF_SPEED
+        MOV     R1, #383        ; Left = QUARTER_SPEED 
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
-Action_Turn_Left
+Action_Sharp_Left
         BL      Set_Dir_Forward
-        LDR     R2, =g_motion_state
-        MOVS    R3, #2
-        STR     R3, [R2]
-
-        LDR     R0, =750
-        LDR     R1, =250
+        MOV     R0, #499        ; Right = HALF_SPEED
+        MOV     R1, #124        ; Left = EIGHTH_SPEED
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
-Action_Turn_Right
+Action_Slight_Right
         BL      Set_Dir_Forward
-        LDR     R2, =g_motion_state
-        MOVS    R3, #3
-        STR     R3, [R2]
-
-        LDR     R0, =250
-        LDR     R1, =750
+        MOV     R0, #383        ; Right = QUARTER_SPEED
+        MOV     R1, #499        ; Left = HALF_SPEED
         BL      PWM_Set_Motor_Speed
         B       End_Update
 
-Action_Stop
-        LDR     R2, =g_motion_state
-        MOVS    R3, #0
-        STR     R3, [R2]
-
-        MOVS    R0, #0
-        MOVS    R1, #0
+Action_Sharp_Right
+        BL      Set_Dir_Forward
+        MOV     R0, #124        ; Right = EIGHTH_SPEED
+        MOV     R1, #499        ; Left = HALF_SPEED
         BL      PWM_Set_Motor_Speed
+        B       End_Update
+
+Action_Search
+        ; ACTIVE BRAKING: Lock the H-Bridge to kill inertia
+        LDR     R0, =GPIOA_BASE
+        MOV     R1, #MOT_IN1
+        BL      GPIO_WritePin     ; IN1 = HIGH
+        MOV     R1, #MOT_IN2
+        BL      GPIO_WritePin     ; IN2 = HIGH
+        MOV     R1, #MOT_IN3
+        BL      GPIO_WritePin     ; IN3 = HIGH
+        MOV     R1, #MOT_IN4
+        BL      GPIO_WritePin     ; IN4 = HIGH
+        
+        MOV     R0, #1000         ; PWM = 100% to engage the lock
+        MOV     R1, #1000
+        BL      PWM_Set_Motor_Speed
+        B       End_Update
 
 End_Update
-        POP     {R4-R6, PC}
+        POP     {R4-R7, PC}     ; Restore registers and return
 
 ; ---------------------------------------------------------------------
-; Set_Dir_Forward
-; PA8=1, PA9=0, PA10=1, PA11=0
+; Helper: Set_Dir_Forward
+; Purpose: Configure PA8-PA11 for forward movement
 ; ---------------------------------------------------------------------
 Set_Dir_Forward
         PUSH    {LR}
-
         LDR     R0, =GPIOA_BASE
-        MOVS    R1, #MOT_IN1
-        BL      GPIO_WritePin
-        MOVS    R1, #MOT_IN2
-        BL      GPIO_ClearPin
-        MOVS    R1, #MOT_IN3
-        BL      GPIO_WritePin
-        MOVS    R1, #MOT_IN4
-        BL      GPIO_ClearPin
-
+        MOV     R1, #MOT_IN1
+        BL      GPIO_WritePin   ; IN1 = High
+        MOV     R1, #MOT_IN2
+        BL      GPIO_ClearPin   ; IN2 = Low
+        MOV     R1, #MOT_IN3
+        BL      GPIO_WritePin   ; IN3 = High
+        MOV     R1, #MOT_IN4
+        BL      GPIO_ClearPin   ; IN4 = Low
         POP     {PC}
 
         END

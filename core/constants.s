@@ -1,6 +1,6 @@
 ;=============================================================================
 ; constants.s
-; INCLUDE-ONLY file – use with:  GET constants.s
+; INCLUDE-ONLY file – use with: GET constants.s
 ;=============================================================================
 
 ;-----------------------------------------------------------------------------
@@ -28,6 +28,8 @@ GPIO_PUPDR          EQU     0x0C
 GPIO_IDR            EQU     0x10
 GPIO_ODR            EQU     0x14
 GPIO_BSRR           EQU     0x18
+GPIO_AFRL           EQU     0x20
+GPIO_AFRH           EQU     0x24
 
 ;-----------------------------------------------------------------------------
 ; Bit masks
@@ -50,24 +52,14 @@ BIT14               EQU     0x00004000
 BIT15               EQU     0x00008000
 
 ;-----------------------------------------------------------------------------
-; TFT
+; TFT – SPI ILI9341
 ;-----------------------------------------------------------------------------
-TFT_DATA_MASK       EQU     0x000000FF
-
-TFT_RS_PIN          EQU     2
-TFT_WR_PIN          EQU     3
-TFT_RD_PIN          EQU     4
-TFT_CS_PIN          EQU     5
-TFT_RST_PIN         EQU     12
-
-TFT_D0              EQU     0       ; PB0
-TFT_D1              EQU     1       ; PB1
-TFT_D2              EQU     2       ; PB2
-TFT_D3              EQU     3       ; PB3
-TFT_D4              EQU     4       ; PB4
-TFT_D5              EQU     5       ; PB5
-TFT_D6              EQU     6       ; PB6
-TFT_D7              EQU     7       ; PB7
+TFT_CS_PIN          EQU     0
+TFT_DC_PIN          EQU     1
+TFT_RS_PIN          EQU     1
+TFT_RST_PIN         EQU     2
+TFT_SCK_PIN         EQU     3
+TFT_MOSI_PIN        EQU     5
 
 ;-----------------------------------------------------------------------------
 ; TFT / ILI9341 commands
@@ -91,11 +83,10 @@ ILI9341_VMCTR2      EQU     0xC7
 ;-----------------------------------------------------------------------------
 ; ADC
 ;-----------------------------------------------------------------------------
-SNS_BREATH_ADC      EQU     0           ; PA0 -> ADC1_IN0
-SNS_SMOKE_ADC       EQU     1           ; PA1 -> ADC1_IN1
+SNS_BREATH_ADC      EQU     0
+SNS_SMOKE_ADC       EQU     1
 
 ADC1_BASE           EQU     0x40012000
-
 ADC_SR              EQU     0x00
 ADC_CR1             EQU     0x04
 ADC_CR2             EQU     0x08
@@ -109,14 +100,15 @@ ADC_CR2_SWSTART     EQU     0x40000000
 ADC_SR_EOC          EQU     0x00000002
 
 ;-----------------------------------------------------------------------------
-; LED / outputs
+; Outputs
 ;-----------------------------------------------------------------------------
 LED_PIN             EQU     12
 ACT_SERVO_SAN       EQU     6
 ACT_SERVO_MED       EQU     7
-BUZZER_PIN          EQU     3
-IR_LED_PORT        EQU     GPIOC_BASE
-IR_LED_PIN         EQU     14
+BUZZER_PIN          EQU     4
+IR_LED_PORT         EQU     GPIOC_BASE
+IR_LED_PIN          EQU     14
+
 ;-----------------------------------------------------------------------------
 ; Motor driver
 ;-----------------------------------------------------------------------------
@@ -125,8 +117,8 @@ MOT_IN2             EQU     9
 MOT_IN3             EQU     10
 MOT_IN4             EQU     11
 
-MOT_ENA             EQU     8
-MOT_ENB             EQU     9
+MOT_ENA             EQU     6
+MOT_ENB             EQU     7
 
 MOTION_STOP         EQU     0
 
@@ -139,68 +131,17 @@ I2C_SDA_PIN         EQU     9
 ;-----------------------------------------------------------------------------
 ; Line tracker
 ;-----------------------------------------------------------------------------
-LINE_LEFT           EQU     0
-LINE_CENTER         EQU     1
-LINE_RIGHT          EQU     2
-
-;-----------------------------------------------------------------------------
-; Keypad rows
-;-----------------------------------------------------------------------------
-KEY_ROW1            EQU     8           ; PA8
-KEY_ROW2            EQU     9           ; PA9
-KEY_ROW3            EQU     10          ; PA10
-KEY_ROW4            EQU     11          ; PA11
-
-;-----------------------------------------------------------------------------
-; Keypad columns
-; REAL WIRING:
-;   C1 = PB13
-;   C2 = PB14
-;   C3 = PB15
-;   C4 = PB10
-;-----------------------------------------------------------------------------
-KEY_COL1            EQU     13          ; PB13
-KEY_COL2            EQU     14          ; PB14
-KEY_COL3            EQU     15          ; PB15
-KEY_COL4            EQU     10          ; PB10
-
-;-----------------------------------------------------------------------------
-; Keypad pull-up masks for PB10, PB13, PB14, PB15
-;-----------------------------------------------------------------------------
-KP_PUPDR_CLEAR      EQU     0xCC300000
-KP_PUPDR_SET        EQU     0x54100000
-
-;-----------------------------------------------------------------------------
-; Keypad codes
-;-----------------------------------------------------------------------------
-KEY_NONE            EQU     0
-
-KEY_1               EQU     1
-KEY_2               EQU     2
-KEY_3               EQU     3
-KEY_A               EQU     4
-
-KEY_4               EQU     5
-KEY_5               EQU     6
-KEY_6               EQU     7
-KEY_B               EQU     8
-
-KEY_7               EQU     9
-KEY_8               EQU     10
-KEY_9               EQU     11
-KEY_C               EQU     12
-
-KEY_STAR            EQU     13
-KEY_0               EQU     14
-KEY_HASH            EQU     15
-KEY_D               EQU     16
+LINE_LEFT           EQU     12
+LINE_CENTER         EQU     13
+LINE_RIGHT          EQU     14
 
 ;-----------------------------------------------------------------------------
 ; Alarm flags
 ;-----------------------------------------------------------------------------
-Smoke_Alert_Flag    EQU     0x00000001
-Med_Alert_Flag      EQU     0x00000002
-SMOKE_IGNORE_ITERATIONS    EQU     200
+Smoke_Alert_Flag        EQU     0x00000001
+Med_Alert_Flag          EQU     0x00000002
+SMOKE_IGNORE_ITERATIONS EQU     200
+
 ;-----------------------------------------------------------------------------
 ; System states
 ;-----------------------------------------------------------------------------
@@ -214,12 +155,102 @@ STATE_MED_INPUT     EQU     6
 STATE_MED_DISPENSE  EQU     7
 STATE_SMOKE_ALERT   EQU     8
 STATE_MED_WAITING   EQU     9
-SYST_CSR        EQU     0xE000E010
-SYST_RVR        EQU     0xE000E014
-SYST_CVR        EQU     0xE000E018
 
-SYST_ENABLE     EQU     0x00000001
-SYST_TICKINT    EQU     0x00000002
-SYST_CLKSRC     EQU     0x00000004
 STATE_INVALID       EQU     0xFFFFFFFF
-	 END
+
+;-----------------------------------------------------------------------------
+; SysTick
+;-----------------------------------------------------------------------------
+SYST_CSR            EQU     0xE000E010
+SYST_RVR            EQU     0xE000E014
+SYST_CVR            EQU     0xE000E018
+
+SYST_ENABLE         EQU     0x00000001
+SYST_TICKINT        EQU     0x00000002
+SYST_CLKSRC         EQU     0x00000004
+
+;-----------------------------------------------------------------------------
+; Generic key codes used by UI / medicine logic
+;-----------------------------------------------------------------------------
+KEY_NONE            EQU     0
+KEY_0               EQU     1
+KEY_1               EQU     2
+KEY_2               EQU     3
+KEY_3               EQU     4
+KEY_4               EQU     5
+KEY_5               EQU     6
+KEY_6               EQU     7
+KEY_7               EQU     8
+KEY_8               EQU     9
+KEY_9               EQU     10
+KEY_A               EQU     11
+KEY_B               EQU     12
+KEY_C               EQU     13
+KEY_D               EQU     14
+
+;-----------------------------------------------------------------------------
+; IR pin map
+; PB10 -> IR receiver
+;-----------------------------------------------------------------------------
+IR_GPIO_PORT        EQU     GPIOB_BASE
+IR_PIN              EQU     10
+
+;-----------------------------------------------------------------------------
+; IR command bytes only
+; IMPORTANT:
+; g_ir_raw_code will carry ONLY the NEC command byte, not the full 32-bit word.
+; This makes the code more tolerant if your remote has a different address byte.
+;-----------------------------------------------------------------------------
+IR_CODE_0           EQU     0x4A
+IR_CODE_1           EQU     0x68
+IR_CODE_2           EQU     0x98
+IR_CODE_3           EQU     0xB0
+IR_CODE_4           EQU     0x30
+IR_CODE_5           EQU     0x18
+IR_CODE_6           EQU     0x7A
+IR_CODE_7           EQU     0x10
+IR_CODE_8           EQU     0x38
+IR_CODE_9           EQU     0x5A
+
+IR_CODE_OK          EQU     0x02
+IR_CODE_CLR         EQU     0x42      ; *
+IR_CODE_BACK        EQU     0x52      ; #
+IR_CODE_EXIT        EQU     0xA8      ; Down
+
+IR_CODE_UP          EQU     0x62
+IR_CODE_LEFT        EQU     0x22
+IR_CODE_RIGHT       EQU     0xC2
+IR_CODE_DOWN        EQU     0xA8
+
+;-----------------------------------------------------------------------------
+; SYSCFG / EXTI / NVIC for IR interrupt
+;-----------------------------------------------------------------------------
+SYSCFG_BASE         EQU     0x40013800
+SYSCFG_EXTICR1      EQU     0x08
+SYSCFG_EXTICR2      EQU     0x0C
+SYSCFG_EXTICR3      EQU     0x10
+SYSCFG_EXTICR4      EQU     0x14
+
+EXTI_BASE           EQU     0x40013C00
+EXTI_IMR            EQU     0x00
+EXTI_EMR            EQU     0x04
+EXTI_RTSR           EQU     0x08
+EXTI_FTSR           EQU     0x0C
+EXTI_SWIER          EQU     0x10
+EXTI_PR             EQU     0x14
+
+NVIC_ISER0          EQU     0xE000E100
+NVIC_ISER1          EQU     0xE000E104
+
+;-----------------------------------------------------------------------------
+; TIM2 for 1 us IR timing
+;-----------------------------------------------------------------------------
+TIM2_BASE           EQU     0x40000000
+TIM_CR1             EQU     0x00
+TIM_CNT             EQU     0x24
+TIM_PSC             EQU     0x28
+TIM_ARR             EQU     0x2C
+TIM_EGR             EQU     0x14
+
+
+        END

@@ -1,5 +1,9 @@
 ; =====================================================================
 ; FILE: medicine.s
+; SAFE FIX:
+; - keep all existing medicine timing / alert / dispense behavior
+; - add a new entry point used by UI-based MED_INPUT
+; - timer input comes from g_med_timer in MINUTES
 ; =====================================================================
         INCLUDE constants.s
 
@@ -21,10 +25,12 @@ med_active          SPACE   4
         IMPORT  g_med_wait_ui
         IMPORT  g_ms_ticks
         IMPORT  g_last_med_tick
+        IMPORT  g_med_timer
         IMPORT  PWM_Set_Servo_Pos
 
         EXPORT  MED_Init
         EXPORT  MED_BackgroundTask
+        EXPORT  MED_StartFromDisplayedMinutes
         EXPORT  Main_State_MedInput
         EXPORT  Main_State_MedWaiting
         EXPORT  Main_State_MedDispense
@@ -42,6 +48,66 @@ MED_Init
         STR     R1, [R0]
         POP     {PC}
 
+; ---------------------------------------------------------------------
+; Used by UI layer:
+; g_med_timer contains MINUTES entered by user
+; This converts to seconds and starts the medicine countdown
+; ---------------------------------------------------------------------
+MED_StartFromDisplayedMinutes
+        PUSH    {R4-R7, LR}
+
+        ; read displayed minutes
+        LDR     R4, =g_med_timer
+        LDR     R5, [R4]
+        CMP     R5, #0
+        BEQ     MSDM_Exit
+
+        ; clear stale med alert flag
+        LDR     R4, =g_alarm_flags
+        LDR     R6, [R4]
+        BIC     R6, R6, #Med_Alert_Flag
+        STR     R6, [R4]
+
+        ; convert minutes -> seconds
+        MOVS    R6, #60
+        MUL     R5, R5, R6
+
+        LDR     R4, =med_seconds
+        STR     R5, [R4]
+
+        ; keep old private mirror aligned (not really needed, but safe)
+        LDR     R4, =g_med_timer
+        LDR     R5, [R4]
+        LDR     R4, =med_input_val
+        STR     R5, [R4]
+
+        ; mark active
+        LDR     R4, =med_active
+        MOVS    R5, #1
+        STR     R5, [R4]
+
+        ; store current tick as last second boundary
+        LDR     R4, =g_ms_ticks
+        LDR     R5, [R4]
+        LDR     R4, =g_last_med_tick
+        STR     R5, [R4]
+
+        ; short waiting screen for 1 second (absolute tick target)
+        LDR     R4, =g_ms_ticks
+        LDR     R5, [R4]
+        LDR     R0, =1000
+        ADDS    R5, R5, R0
+        LDR     R4, =g_med_wait_ui
+        STR     R5, [R4]
+
+        ; go to waiting screen
+        LDR     R4, =g_sys_state
+        MOVS    R5, #STATE_MED_WAITING
+        STR     R5, [R4]
+
+MSDM_Exit
+        POP     {R4-R7, PC}
+
 MED_BackgroundTask
         PUSH    {R4-R7, LR}
         LDR     R4, =med_active
@@ -54,7 +120,7 @@ MED_BackgroundTask
         LDR     R4, =g_last_med_tick
         LDR     R6, [R4]
         SUBS    R7, R5, R6
-        LDR     R0, =1000 
+        LDR     R0, =1000
         CMP     R7, R0
         BLO     MBG_Exit
 
@@ -72,16 +138,22 @@ MBG_Finished
         MOVS    R5, #0
         LDR     R4, =med_active
         STR     R5, [R4]
+
         LDR     R4, =g_alarm_flags
         LDR     R6, [R4]
         ORR     R6, R6, #Med_Alert_Flag
         STR     R6, [R4]
+
         LDR     R4, =g_sys_state
-        MOVS    R6, #4 ; STATE_MED_ALERT
-        STR     R6, [R4] 
+        MOVS    R6, #STATE_MED_ALERT
+        STR     R6, [R4]
+
 MBG_Exit
         POP     {R4-R7, PC}
 
+; ---------------------------------------------------------------------
+; Legacy keypad path kept intact, but not used by current IR main
+; ---------------------------------------------------------------------
 Main_State_MedInput
         PUSH    {R4-R7, LR}
         LDR     R4, =g_keycode
@@ -92,12 +164,14 @@ Main_State_MedInput
         MOVS    R7, #0
         STR     R7, [R6]
         B       MSI_Exit
+
 MSI_Check
         LDR     R6, =med_last_key
         LDR     R7, [R6]
         CMP     R5, R7
         BEQ     MSI_Exit
         STR     R5, [R6]
+
         CMP     R5, #KEY_A
         BEQ     MSI_Confirm
         CMP     R5, #KEY_B
@@ -126,7 +200,7 @@ MSI_Clear
 
 MSI_Back
         LDR     R6, =g_sys_state
-        MOVS    R7, #0 ; STATE_MAIN_MENU
+        MOVS    R7, #STATE_MAIN_MENU
         STR     R7, [R6]
         B       MSI_Exit
 
@@ -135,14 +209,17 @@ MSI_Confirm
         LDR     R7, [R6]
         CMP     R7, #0
         BEQ     MSI_Exit
+
         MOVS    R1, #60
-        MUL     R7, R7, R1 
+        MUL     R7, R7, R1
         LDR     R6, =med_seconds
         STR     R7, [R6]
+
         LDR     R6, =g_ms_ticks
         LDR     R7, [R6]
         LDR     R6, =g_last_med_tick
         STR     R7, [R6]
+
         LDR     R6, =med_active
         MOVS    R7, #1
         STR     R7, [R6]
@@ -155,7 +232,7 @@ MSI_Confirm
         STR     R7, [R6]
 
         LDR     R6, =g_sys_state
-        MOVS    R7, #9 ; STATE_MED_WAITING
+        MOVS    R7, #STATE_MED_WAITING
         STR     R7, [R6]
 
         LDR     R6, =med_input_val
@@ -170,38 +247,55 @@ Main_State_MedWaiting
         LDR     R5, [R4]
         LDR     R4, =g_med_wait_ui
         LDR     R6, [R4]
-        CMP     R5, R6 
+        CMP     R5, R6
         BLO     MSW_Exit
+
         LDR     R4, =g_sys_state
-        MOVS    R5, #0 
+        MOVS    R5, #STATE_MAIN_MENU
         STR     R5, [R4]
+
 MSW_Exit
         POP     {R4-R6, PC}
 
 Main_State_MedDispense
         PUSH    {R4-R6, LR}
+
         LDR     R0, =2000
         MOVS    R1, #1
         BL      PWM_Set_Servo_Pos
+
         LDR     R4, =300000
 MSD_Delay1
         SUBS    R4, R4, #1
         BNE     MSD_Delay1
+
         LDR     R0, =1500
         MOVS    R1, #1
         BL      PWM_Set_Servo_Pos
+
         LDR     R4, =g_alarm_flags
         LDR     R5, [R4]
         BIC     R5, R5, #Med_Alert_Flag
         STR     R5, [R4]
+
         LDR     R4, =med_seconds
         MOVS    R5, #0
         STR     R5, [R4]
+
         LDR     R4, =med_active
         STR     R5, [R4]
-        LDR     R4, =g_sys_state
-        MOVS    R5, #0
+
+        ; clear displayed input too, so next entry starts clean
+        LDR     R4, =g_med_timer
         STR     R5, [R4]
+
+        LDR     R4, =med_input_val
+        STR     R5, [R4]
+
+        LDR     R4, =g_sys_state
+        MOVS    R5, #STATE_MAIN_MENU
+        STR     R5, [R4]
+
         POP     {R4-R6, PC}
 
 Key_To_Num
@@ -209,39 +303,48 @@ Key_To_Num
         BNE     K_1
         MOVS    R0, #0
         BX      LR
-K_1     CMP     R0, #KEY_1
+K_1
+        CMP     R0, #KEY_1
         BNE     K_2
         MOVS    R0, #1
         BX      LR
-K_2     CMP     R0, #KEY_2
+K_2
+        CMP     R0, #KEY_2
         BNE     K_3
         MOVS    R0, #2
         BX      LR
-K_3     CMP     R0, #KEY_3
+K_3
+        CMP     R0, #KEY_3
         BNE     K_4
         MOVS    R0, #3
         BX      LR
-K_4     CMP     R0, #KEY_4
+K_4
+        CMP     R0, #KEY_4
         BNE     K_5
         MOVS    R0, #4
         BX      LR
-K_5     CMP     R0, #KEY_5
+K_5
+        CMP     R0, #KEY_5
         BNE     K_6
         MOVS    R0, #5
         BX      LR
-K_6     CMP     R0, #KEY_6
+K_6
+        CMP     R0, #KEY_6
         BNE     K_7
         MOVS    R0, #6
         BX      LR
-K_7     CMP     R0, #KEY_7
+K_7
+        CMP     R0, #KEY_7
         BNE     K_8
         MOVS    R0, #7
         BX      LR
-K_8     CMP     R0, #KEY_8
+K_8
+        CMP     R0, #KEY_8
         BNE     K_9
         MOVS    R0, #8
         BX      LR
-K_9     CMP     R0, #KEY_9
+K_9
+        CMP     R0, #KEY_9
         BNE     K_Err
         MOVS    R0, #9
         BX      LR

@@ -1,6 +1,6 @@
 ; =====================================================================
 ; FILE: pwm.s
-; DESCRIPTION: PWM Driver for Speed Control and Servo Actuation
+; DESCRIPTION: Unified PWM Driver for DC Motor Speed and Servo Actuation
 ; LAYER: Low-Level Driver (Layer 3)
 ; =====================================================================
 
@@ -34,27 +34,29 @@ TIM_CCR4        EQU     0x40
 ; ---------------------------------------------------------------------
 ; PWM_Init
 ; Initializes:
-;   TIM3 CH1/CH2 -> PA6 / PA7  (servos, 50 Hz)
-;   TIM4 CH3/CH4 -> PB8 / PB9  (motor PWM)
+;   TIM3 CH1/CH2 -> PA6 / PA7  (Servos, 50 Hz)
+;   TIM4 CH1/CH2 -> PB6 / PB7  (DC Motors, 1 kHz)
 ; ---------------------------------------------------------------------
 PWM_Init
         PUSH    {R4-R6, LR}
 
-        ; Enable GPIOA + GPIOB clocks.
+        ; 1. Enable Clocks for GPIOA (Bit 0) and GPIOB (Bit 1) on AHB1
         LDR     R0, =RCC_BASE
         LDR     R1, [R0, #RCC_AHB1ENR]
         ORR     R1, R1, #0x03
         STR     R1, [R0, #RCC_AHB1ENR]
 
-        ; Enable TIM3 + TIM4 clocks on APB1.
+        ; 2. Enable Clocks for TIM3 (Bit 1) and TIM4 (Bit 2) on APB1
         LDR     R1, [R0, #RCC_APB1ENR]
         ORR     R1, R1, #0x06
         STR     R1, [R0, #RCC_APB1ENR]
 
         ; -------------------------------------------------------------
-        ; PA6 / PA7 -> Alternate Function mode, AF2 (TIM3 CH1 / CH2)
+        ; Configure PA6 / PA7 for Alternate Function (TIM3 CH1/CH2)
         ; -------------------------------------------------------------
         LDR     R0, =GPIOA_BASE
+        
+        ; Set MODER to AF (10) for PA6 and PA7
         LDR     R1, [R0, #GPIO_MODER]
         LDR     R2, =0x0000F000
         BIC     R1, R1, R2
@@ -62,6 +64,7 @@ PWM_Init
         ORR     R1, R1, R2
         STR     R1, [R0, #GPIO_MODER]
 
+        ; Set AFRL to AF2 (0x02) for PA6 and PA7
         LDR     R1, [R0, #GPIO_AFRL]
         LDR     R2, =0xFF000000
         BIC     R1, R1, R2
@@ -70,27 +73,29 @@ PWM_Init
         STR     R1, [R0, #GPIO_AFRL]
 
         ; -------------------------------------------------------------
-        ; PB8 / PB9 -> Alternate Function mode, AF2 (TIM4 CH3 / CH4)
+        ; Configure PB6 / PB7 for Alternate Function (TIM4 CH1/CH2)
         ; -------------------------------------------------------------
-       ; LDR     R0, =GPIOB_BASE
-       ; LDR     R1, [R0, #GPIO_MODER]
-        ;LDR     R2, =0x000F0000
-        ;BIC     R1, R1, R2
-        ;LDR     R2, =0x000A0000
-        ;ORR     R1, R1, R2
-        ;STR     R1, [R0, #GPIO_MODER]
+        LDR     R0, =GPIOB_BASE
 
-        ;LDR     R1, [R0, #GPIO_AFRH]
-        ;LDR     R2, =0x000000FF
-        ;BIC     R1, R1, R2
-        ;LDR     R2, =0x00000022
-        ;ORR     R1, R1, R2
-       ; STR     R1, [R0, #GPIO_AFRH]
+        ; Set MODER to AF (10) for PB6 and PB7
+        LDR     R1, [R0, #GPIO_MODER]
+        LDR     R2, =0x0000F000
+        BIC     R1, R1, R2
+        LDR     R2, =0x0000A000
+        ORR     R1, R1, R2
+        STR     R1, [R0, #GPIO_MODER]
+
+        ; Set AFRL to AF2 (0x02) for PB6 and PB7
+        LDR     R1, [R0, #GPIO_AFRL]
+        LDR     R2, =0xFF000000
+        BIC     R1, R1, R2
+        LDR     R2, =0x22000000
+        ORR     R1, R1, R2
+        STR     R1, [R0, #GPIO_AFRL]
 
         ; -------------------------------------------------------------
-        ; TIM3 for servos
-        ; 16 MHz / (15 + 1) = 1 MHz timer tick
-        ; ARR = 20000 -> 20 ms period -> 50 Hz
+        ; Setup TIM3 (Servos @ 50Hz)
+        ; 16 MHz / (15 + 1) = 1 MHz tick. ARR = 20000 (20ms period)
         ; -------------------------------------------------------------
         LDR     R4, =TIM3_BASE
         MOVS    R0, #15
@@ -98,72 +103,70 @@ PWM_Init
         LDR     R0, =20000
         STR     R0, [R4, #TIM_ARR]
 
-        ; PWM mode 1 on CH1 and CH2, preload enabled.
+        ; Enable PWM Mode 1 on CH1/CH2
         LDR     R0, =0x6868
         STR     R0, [R4, #TIM_CCMR1]
 
-        ; Enable CH1 and CH2 outputs.
+        ; Enable Output pins
         LDR     R0, =0x0011
         STR     R0, [R4, #TIM_CCER]
 
-        ; Neutral startup pulse for both servos.
+        ; Safe Startup: Neutral position (1500us) for both servos
         LDR     R0, =1500
         STR     R0, [R4, #TIM_CCR1]
         STR     R0, [R4, #TIM_CCR2]
 
-        ; Start TIM3.
+        ; Start TIM3
         MOVS    R0, #1
         STR     R0, [R4, #TIM_CR1]
 
         ; -------------------------------------------------------------
-        ; TIM4 for DC motor PWM
-        ; 16 MHz / (15 + 1) = 1 MHz timer tick
-        ; ARR = 1000 -> 1 kHz PWM
+        ; Setup TIM4 (DC Motors @ 1kHz)
+        ; 16 MHz / (15 + 1) = 1 MHz tick. ARR = 1000 (1ms period)
         ; -------------------------------------------------------------
-       ; LDR     R4, =TIM4_BASE
-       ; MOVS    R0, #15
-        ;STR     R0, [R4, #TIM_PSC]
-        ;LDR     R0, =1000
-        ;STR     R0, [R4, #TIM_ARR]
+        LDR     R4, =TIM4_BASE
+        MOVS    R0, #15
+        STR     R0, [R4, #TIM_PSC]
+        LDR     R0, =1000
+        STR     R0, [R4, #TIM_ARR]
 
-        ; PWM mode 1 on CH3 and CH4, preload enabled.
-        ;LDR     R0, =0x6868
-        ;STR     R0, [R4, #TIM_CCMR2]
+        ; Enable PWM Mode 1 on CH1/CH2
+        LDR     R0, =0x6868
+        STR     R0, [R4, #TIM_CCMR1]
 
-        ; Enable CH3 and CH4 outputs.
-        ;LDR     R0, =0x1100
-        ;STR     R0, [R4, #TIM_CCER]
+        ; Enable Output pins
+        LDR     R0, =0x0011
+        STR     R0, [R4, #TIM_CCER]
 
-        ; Start motors at 0 duty.
-        ;MOVS    R0, #0
-        ;STR     R0, [R4, #TIM_CCR3]
-        ;STR     R0, [R4, #TIM_CCR4]
+        ; Safe Startup: Motors strictly at 0% Duty Cycle
+        MOVS    R0, #0
+        STR     R0, [R4, #TIM_CCR1]
+        STR     R0, [R4, #TIM_CCR2]
 
-        ; Start TIM4.
-        ;MOVS    R0, #1
-        ;STR     R0, [R4, #TIM_CR1]
+        ; Start TIM4
+        MOVS    R0, #1
+        STR     R0, [R4, #TIM_CR1]
 
         POP     {R4-R6, PC}
 
 ; ---------------------------------------------------------------------
 ; PWM_Set_Motor_Speed
 ; Inputs:
-;   R0 = right speed (TIM4 CH3 / PB8)
-;   R1 = left  speed (TIM4 CH4 / PB9)
+;   R0 = Right Motor Speed (0-1000) -> TIM4 CH1 (PB6)
+;   R1 = Left Motor Speed  (0-1000) -> TIM4 CH2 (PB7)
 ; ---------------------------------------------------------------------
 PWM_Set_Motor_Speed
- ;       PUSH    {R4, LR}
-  ;      LDR     R4, =TIM4_BASE
-   ;     STR     R0, [R4, #TIM_CCR3]
-    ;    STR     R1, [R4, #TIM_CCR4]
-     ;   POP     {R4, PC}
-		BX LR 
+        PUSH    {R4, LR}
+        LDR     R4, =TIM4_BASE
+        STR     R0, [R4, #TIM_CCR1]
+        STR     R1, [R4, #TIM_CCR2]
+        POP     {R4, PC}
+
 ; ---------------------------------------------------------------------
 ; PWM_Set_Servo_Pos
 ; Inputs:
-;   R0 = pulse width in microseconds (typically 1000..2000)
-;   R1 = 0 -> sanitizing servo  (TIM3 CH1 / PA6)
-;        1 -> medicine servo    (TIM3 CH2 / PA7)
+;   R0 = Pulse Width in microseconds (e.g., 1000 to 2000)
+;   R1 = Servo ID (0 = Sanitizing PA6, 1 = Medicine PA7)
 ; ---------------------------------------------------------------------
 PWM_Set_Servo_Pos
         PUSH    {R4, LR}
@@ -172,10 +175,12 @@ PWM_Set_Servo_Pos
         CMP     R1, #0
         BEQ     PWM_Set_Servo_SAN
 
+        ; If R1 != 0, write to Medicine Servo (CH2)
         STR     R0, [R4, #TIM_CCR2]
         POP     {R4, PC}
 
 PWM_Set_Servo_SAN
+        ; If R1 == 0, write to Sanitizer Servo (CH1)
         STR     R0, [R4, #TIM_CCR1]
         POP     {R4, PC}
 

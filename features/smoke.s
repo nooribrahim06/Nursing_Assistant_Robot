@@ -30,7 +30,7 @@ smoke_high_counter      SPACE   4
 ;-----------------------------------------------------------------------------
 ; Tunable thresholds
 ;-----------------------------------------------------------------------------
-SMOKE_THRESHOLD_SET     EQU     3500    ; set alert if >= this
+SMOKE_THRESHOLD_SET     EQU    500    ; set alert if >= this
 SMOKE_THRESHOLD_CLEAR   EQU     3200    ; clear alert only if < this
 SMOKE_WARMUP_COUNT      EQU     300     ; ignore first iterations after startup
 SMOKE_CONFIRM_COUNT     EQU     8       ; require 8 consecutive highs

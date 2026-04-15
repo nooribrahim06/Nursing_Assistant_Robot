@@ -1,21 +1,29 @@
 ; =====================================================================
 ; FILE: tft_low.s
 ; DESCRIPTION:
-;   Low-level TFT driver for ILI9341 using 8080 8-bit parallel interface.
+;   Low-level TFT driver for ILI9341 using SPI1 on STM32F401.
 ;
-;   Control pins  -> GPIOA
-;       PA2  = RS
-;       PA3  = WR
-;       PA4  = RD
-;       PA5  = CS
-;       PA12 = RST
+; FINAL TFT SPI MAP
+;   PB0 -> TFT_CS
+;   PB1 -> TFT_DC / RS
+;   PB2 -> TFT_RST
+;   PB3 -> SPI1_SCK   (AF5)
+;   PB5 -> SPI1_MOSI  (AF5)
+;   PB4 -> unused
+;   MISO -> not used
 ;
-;   Data bus -> GPIOB
-;       PB0..PB7 = D0..D7
+; NOTES:
+;   - Revised for better Proteus compatibility
+;   - Uses normal 2-line SPI master mode
+;   - Keeps CS low across command + parameter bytes in init/window setup
+;   - Landscape mode uses MADCTL = 0x28
+;     If your module is mirrored, try 0xE8 instead
 ; =====================================================================
 
         AREA    TFT_LOW, CODE, READONLY
         THUMB
+        PRESERVE8
+        ALIGN
 
         EXPORT  TFT_Init
         EXPORT  TFT_Reset
@@ -24,374 +32,408 @@
         EXPORT  TFT_WriteData16
         EXPORT  TFT_SetAddressWindow
 
-        IMPORT  GPIO_EnableClock
-        IMPORT  GPIO_ConfigOutput
+RCC_BASE                EQU     0x40023800
+RCC_AHB1ENR             EQU     0x30
+RCC_APB2ENR             EQU     0x44
 
-; ========================= GPIO BASE =========================
-GPIOA_BASE      EQU     0x40020000
-GPIOB_BASE      EQU     0x40020400
+RCC_AHB1ENR_GPIOBEN     EQU     0x00000002
+RCC_APB2ENR_SPI1EN      EQU     0x00001000
 
-; ========================= GPIO OFFSETS ======================
-GPIO_ODR        EQU     0x14
-GPIO_BSRR       EQU     0x18
+GPIOB_BASE              EQU     0x40020400
+GPIO_MODER              EQU     0x00
+GPIO_OTYPER             EQU     0x04
+GPIO_OSPEEDR            EQU     0x08
+GPIO_PUPDR              EQU     0x0C
+GPIO_BSRR               EQU     0x18
+GPIO_AFRL               EQU     0x20
 
-; ========================= TFT PIN CONSTANTS =================
-TFT_RS_PIN      EQU     2
-TFT_WR_PIN      EQU     3
-TFT_RD_PIN      EQU     4
-TFT_CS_PIN      EQU     5
-TFT_RST_PIN     EQU     12
+SPI1_BASE               EQU     0x40013000
+SPI_CR1                 EQU     0x00
+SPI_SR                  EQU     0x08
+SPI_DR                  EQU     0x0C
 
-; ========================= ILI9341 COMMANDS ==================
-ILI9341_SWRESET EQU     0x01
-ILI9341_SLPOUT  EQU     0x11
-ILI9341_GAMSET  EQU     0x26
-ILI9341_DISPON  EQU     0x29
-ILI9341_CASET   EQU     0x2A
-ILI9341_PASET   EQU     0x2B
-ILI9341_RAMWR   EQU     0x2C
-ILI9341_MADCTL  EQU     0x36
-ILI9341_PIXFMT  EQU     0x3A
-ILI9341_FRMCTR1 EQU     0xB1
-ILI9341_DFUNCTR EQU     0xB6
-ILI9341_PWCTR1  EQU     0xC0
-ILI9341_PWCTR2  EQU     0xC1
-ILI9341_VMCTR1  EQU     0xC5
-ILI9341_VMCTR2  EQU     0xC7
+SPI_SR_TXE              EQU     0x02
+SPI_SR_BSY              EQU     0x80
 
-; =====================================================================
-; TFT_GPIO_Init
-; =====================================================================
-TFT_GPIO_Init FUNCTION
-        PUSH    {R4, LR}
+SPI1_CR1_VALUE          EQU     0x0000035C
 
-        ; Enable GPIOA + GPIOB clocks
-        LDR     R0, =GPIOA_BASE
-        BL      GPIO_EnableClock
-        LDR     R0, =GPIOB_BASE
-        BL      GPIO_EnableClock
+ILI9341_SWRESET         EQU     0x01
+ILI9341_SLPOUT          EQU     0x11
+ILI9341_GAMSET          EQU     0x26
+ILI9341_DISPON          EQU     0x29
+ILI9341_CASET           EQU     0x2A
+ILI9341_PASET           EQU     0x2B
+ILI9341_RAMWR           EQU     0x2C
+ILI9341_MADCTL          EQU     0x36
+ILI9341_PIXFMT          EQU     0x3A
+ILI9341_FRMCTR1         EQU     0xB1
+ILI9341_DFUNCTR         EQU     0xB6
+ILI9341_PWCTR1          EQU     0xC0
+ILI9341_PWCTR2          EQU     0xC1
+ILI9341_VMCTR1          EQU     0xC5
+ILI9341_VMCTR2          EQU     0xC7
 
-        ; Control pins on GPIOA
-        LDR     R0, =GPIOA_BASE
-        MOV     R1, #TFT_RS_PIN
-        BL      GPIO_ConfigOutput
-        MOV     R1, #TFT_WR_PIN
-        BL      GPIO_ConfigOutput
-        MOV     R1, #TFT_RD_PIN
-        BL      GPIO_ConfigOutput
-        MOV     R1, #TFT_CS_PIN
-        BL      GPIO_ConfigOutput
-        MOV     R1, #TFT_RST_PIN
-        BL      GPIO_ConfigOutput
+GPIOB_TFT_MODER_MASK    EQU     0x00000CFF
+GPIOB_TFT_MODER_VALUE   EQU     0x00000895
 
-        ; Data pins PB0..PB7
-        LDR     R0, =GPIOB_BASE
-        MOV     R4, #0
-ConfigDataLoop
-        MOV     R1, R4
-        BL      GPIO_ConfigOutput
-        ADD     R4, R4, #1
-        CMP     R4, #8
-        BNE     ConfigDataLoop
+GPIOB_TFT_OT_MASK       EQU     0x0000002F
 
-        POP     {R4, PC}
-        ENDFUNC
+GPIOB_TFT_OSPEED_MASK   EQU     0x00000CFF
+GPIOB_TFT_OSPEED_VALUE  EQU     0x00000CFF
 
-; =====================================================================
-; TFT_PinHighA / TFT_PinLowA
-; =====================================================================
-TFT_PinHighA FUNCTION
-        PUSH    {R1, R2, LR}
-        LDR     R1, =GPIOA_BASE
-        MOVS    R2, #1
-        LSLS    R2, R2, R0
-        STR     R2, [R1, #GPIO_BSRR]
-        POP     {R1, R2, LR}
-        BX      LR
-        ENDFUNC
+GPIOB_TFT_PUPDR_MASK    EQU     0x00000CFF
 
-TFT_PinLowA FUNCTION
-        PUSH    {R1, R2, LR}
-        LDR     R1, =GPIOA_BASE
-        MOVS    R2, #1
-        LSLS    R2, R2, R0
-        LSLS    R2, R2, #16
-        STR     R2, [R1, #GPIO_BSRR]
-        POP     {R1, R2, LR}
-        BX      LR
-        ENDFUNC
+GPIOB_TFT_AFRL_MASK     EQU     0x00F0F000
+GPIOB_TFT_AFRL_AF5      EQU     0x00505000
 
-; =====================================================================
-; TFT_Delay_Short / TFT_Delay_Long
-; Reduced to speed up display writes and screen switching.
-; If Proteus becomes unstable, raise SHORT to 6 or 8.
-; =====================================================================
-TFT_Delay_Short FUNCTION
-        PUSH    {R0, LR}
-        MOVS    R0, #4
-TFT_Delay_Short_Loop
+TFT_BSRR_IDLE_HIGH      EQU     0x00000007
+TFT_BSRR_CS_HIGH        EQU     0x00000001
+TFT_BSRR_CS_LOW         EQU     0x00010000
+TFT_BSRR_DC_HIGH        EQU     0x00000002
+TFT_BSRR_DC_LOW         EQU     0x00020000
+TFT_BSRR_RST_HIGH       EQU     0x00000004
+TFT_BSRR_RST_LOW        EQU     0x00040000
+
+TFT_BSRR_CMD_MODE       EQU     0x00030000
+TFT_BSRR_DATA_MODE      EQU     0x00010002
+
+TFT_DELAY_RESET_SHORT   EQU     1000000
+TFT_DELAY_RESET_LONG    EQU     2500000
+TFT_DELAY_SWRESET       EQU     2500000
+TFT_DELAY_SLPOUT        EQU     9000000
+TFT_DELAY_POST_DISPON   EQU     2000000
+
+TFT_Delay
+TFT_Delay_Loop
         SUBS    R0, R0, #1
-        BNE     TFT_Delay_Short_Loop
-        POP     {R0, LR}
+        BNE     TFT_Delay_Loop
         BX      LR
-        ENDFUNC
 
-TFT_Delay_Long FUNCTION
-        PUSH    {R0, LR}
-        LDR     R0, =30000
-TFT_Delay_Long_Loop
-        SUBS    R0, R0, #1
-        BNE     TFT_Delay_Long_Loop
-        POP     {R0, LR}
+TFT_GPIO_SPI_Init
+        PUSH    {R1-R3, LR}
+
+        LDR     R0, =RCC_BASE
+        LDR     R1, [R0, #RCC_AHB1ENR]
+        LDR     R2, =RCC_AHB1ENR_GPIOBEN
+        ORR     R1, R1, R2
+        STR     R1, [R0, #RCC_AHB1ENR]
+
+        LDR     R0, =GPIOB_BASE
+
+        LDR     R1, [R0, #GPIO_MODER]
+        LDR     R2, =GPIOB_TFT_MODER_MASK
+        BIC     R1, R1, R2
+        LDR     R2, =GPIOB_TFT_MODER_VALUE
+        ORR     R1, R1, R2
+        STR     R1, [R0, #GPIO_MODER]
+
+        LDR     R1, [R0, #GPIO_OTYPER]
+        LDR     R2, =GPIOB_TFT_OT_MASK
+        BIC     R1, R1, R2
+        STR     R1, [R0, #GPIO_OTYPER]
+
+        LDR     R1, [R0, #GPIO_OSPEEDR]
+        LDR     R2, =GPIOB_TFT_OSPEED_MASK
+        BIC     R1, R1, R2
+        LDR     R2, =GPIOB_TFT_OSPEED_VALUE
+        ORR     R1, R1, R2
+        STR     R1, [R0, #GPIO_OSPEEDR]
+
+        LDR     R1, [R0, #GPIO_PUPDR]
+        LDR     R2, =GPIOB_TFT_PUPDR_MASK
+        BIC     R1, R1, R2
+        STR     R1, [R0, #GPIO_PUPDR]
+
+        LDR     R1, [R0, #GPIO_AFRL]
+        LDR     R2, =GPIOB_TFT_AFRL_MASK
+        BIC     R1, R1, R2
+        LDR     R2, =GPIOB_TFT_AFRL_AF5
+        ORR     R1, R1, R2
+        STR     R1, [R0, #GPIO_AFRL]
+
+        LDR     R1, =TFT_BSRR_IDLE_HIGH
+        STR     R1, [R0, #GPIO_BSRR]
+
+        LDR     R0, =RCC_BASE
+        LDR     R1, [R0, #RCC_APB2ENR]
+        LDR     R2, =RCC_APB2ENR_SPI1EN
+        ORR     R1, R1, R2
+        STR     R1, [R0, #RCC_APB2ENR]
+
+        LDR     R0, =SPI1_BASE
+        MOVS    R1, #0
+        STR     R1, [R0, #SPI_CR1]
+
+        LDR     R1, =SPI1_CR1_VALUE
+        STR     R1, [R0, #SPI_CR1]
+
+        POP     {R1-R3, PC}
+
+SPI_SendByte
+        LDR     R1, =SPI1_BASE
+
+SPI_WaitTXE_1
+        LDR     R2, [R1, #SPI_SR]
+        TST     R2, #SPI_SR_TXE
+        BEQ     SPI_WaitTXE_1
+
+        STRB    R0, [R1, #SPI_DR]
+
+SPI_WaitTXE_2
+        LDR     R2, [R1, #SPI_SR]
+        TST     R2, #SPI_SR_TXE
+        BEQ     SPI_WaitTXE_2
+
+SPI_WaitBSY
+        LDR     R2, [R1, #SPI_SR]
+        TST     R2, #SPI_SR_BSY
+        BNE     SPI_WaitBSY
+
         BX      LR
-        ENDFUNC
 
-; =====================================================================
-; TFT_WriteBusByte
-; Put one byte on PB0..PB7
-; INPUT: R0 = byte
-; =====================================================================
-TFT_WriteBusByte FUNCTION
-        PUSH    {R1, R2, R3, LR}
+TFT_BeginCommand
+        LDR     R1, =GPIOB_BASE
+        LDR     R0, =TFT_BSRR_CMD_MODE
+        STR     R0, [R1, #GPIO_BSRR]
+        BX      LR
+
+TFT_SwitchToData
+        LDR     R1, =GPIOB_BASE
+        LDR     R0, =TFT_BSRR_DC_HIGH
+        STR     R0, [R1, #GPIO_BSRR]
+        BX      LR
+
+TFT_EndTransaction
+        LDR     R1, =GPIOB_BASE
+        LDR     R0, =TFT_BSRR_CS_HIGH
+        STR     R0, [R1, #GPIO_BSRR]
+        BX      LR
+
+TFT_Reset
+        PUSH    {R1, LR}
+
         LDR     R1, =GPIOB_BASE
 
-        LDR     R2, [R1, #GPIO_ODR]
-        BIC     R2, R2, #0xFF
-        AND     R3, R0, #0xFF
-        ORR     R2, R2, R3
-        STR     R2, [R1, #GPIO_ODR]
+        LDR     R0, =TFT_BSRR_RST_HIGH
+        STR     R0, [R1, #GPIO_BSRR]
+        LDR     R0, =TFT_DELAY_RESET_SHORT
+        BL      TFT_Delay
 
-        POP     {R1, R2, R3, LR}
-        BX      LR
-        ENDFUNC
+        LDR     R0, =TFT_BSRR_RST_LOW
+        STR     R0, [R1, #GPIO_BSRR]
+        LDR     R0, =TFT_DELAY_RESET_SHORT
+        BL      TFT_Delay
 
-; =====================================================================
-; TFT_PulseWR
-; =====================================================================
-TFT_PulseWR FUNCTION
-        PUSH    {R0, LR}
+        LDR     R0, =TFT_BSRR_RST_HIGH
+        STR     R0, [R1, #GPIO_BSRR]
+        LDR     R0, =TFT_DELAY_RESET_LONG
+        BL      TFT_Delay
 
-        MOVS    R0, #TFT_WR_PIN
-        BL      TFT_PinLowA
-        BL      TFT_Delay_Short
+        POP     {R1, PC}
 
-        MOVS    R0, #TFT_WR_PIN
-        BL      TFT_PinHighA
-        BL      TFT_Delay_Short
-
-        POP     {R0, PC}
-        ENDFUNC
-
-; =====================================================================
-; TFT_SendCommand
-; =====================================================================
-TFT_SendCommand FUNCTION
-        PUSH    {R1, LR}
-        MOV     R1, R0
-
-        MOVS    R0, #TFT_RS_PIN
-        BL      TFT_PinLowA
-        MOVS    R0, #TFT_CS_PIN
-        BL      TFT_PinLowA
-
-        MOV     R0, R1
-        BL      TFT_WriteBusByte
-        BL      TFT_PulseWR
-
-        MOVS    R0, #TFT_CS_PIN
-        BL      TFT_PinHighA
-
-        POP     {R1, LR}
-        BX      LR
-        ENDFUNC
-
-; =====================================================================
-; TFT_SendData
-; =====================================================================
-TFT_SendData FUNCTION
-        PUSH    {R1, LR}
-        MOV     R1, R0
-
-        MOVS    R0, #TFT_RS_PIN
-        BL      TFT_PinHighA
-        MOVS    R0, #TFT_CS_PIN
-        BL      TFT_PinLowA
-
-        MOV     R0, R1
-        BL      TFT_WriteBusByte
-        BL      TFT_PulseWR
-
-        MOVS    R0, #TFT_CS_PIN
-        BL      TFT_PinHighA
-
-        POP     {R1, LR}
-        BX      LR
-        ENDFUNC
-
-; =====================================================================
-; TFT_WriteData16
-; INPUT: R0 = 16-bit RGB565
-; =====================================================================
-TFT_WriteData16 FUNCTION
+TFT_SendCommand
         PUSH    {R4, LR}
         MOV     R4, R0
 
+        BL      TFT_BeginCommand
+        MOV     R0, R4
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
+
+        POP     {R4, PC}
+
+TFT_SendData
+        PUSH    {R4, R5, LR}
+
+        MOV     R4, R0
+        LDR     R5, =GPIOB_BASE
+        LDR     R0, =TFT_BSRR_DATA_MODE
+        STR     R0, [R5, #GPIO_BSRR]
+
+        MOV     R0, R4
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
+
+        POP     {R4, R5, PC}
+
+TFT_WriteData16
+        PUSH    {R4, R5, LR}
+
+        MOV     R4, R0
+        LDR     R5, =GPIOB_BASE
+
+        LDR     R0, =TFT_BSRR_DATA_MODE
+        STR     R0, [R5, #GPIO_BSRR]
+
         LSRS    R0, R4, #8
-        BL      TFT_SendData
+        BL      SPI_SendByte
+
         AND     R0, R4, #0xFF
-        BL      TFT_SendData
+        BL      SPI_SendByte
 
-        POP     {R4, LR}
-        BX      LR
-        ENDFUNC
+        BL      TFT_EndTransaction
 
-; =====================================================================
-; TFT_SetAddressWindow
-; INPUT: R0=x0, R1=y0, R2=x1, R3=y1
-; =====================================================================
-TFT_SetAddressWindow FUNCTION
-        PUSH    {R4, R5, R6, R7, LR}
+        POP     {R4, R5, PC}
+
+TFT_SetAddressWindow
+        PUSH    {R4-R7, LR}
+
         MOV     R4, R0
         MOV     R5, R1
         MOV     R6, R2
         MOV     R7, R3
 
+        BL      TFT_BeginCommand
         MOVS    R0, #ILI9341_CASET
-        BL      TFT_SendCommand
+        BL      SPI_SendByte
+        BL      TFT_SwitchToData
         LSRS    R0, R4, #8
-        BL      TFT_SendData
+        BL      SPI_SendByte
         AND     R0, R4, #0xFF
-        BL      TFT_SendData
+        BL      SPI_SendByte
         LSRS    R0, R6, #8
-        BL      TFT_SendData
+        BL      SPI_SendByte
         AND     R0, R6, #0xFF
-        BL      TFT_SendData
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
 
+        BL      TFT_BeginCommand
         MOVS    R0, #ILI9341_PASET
-        BL      TFT_SendCommand
+        BL      SPI_SendByte
+        BL      TFT_SwitchToData
         LSRS    R0, R5, #8
-        BL      TFT_SendData
+        BL      SPI_SendByte
         AND     R0, R5, #0xFF
-        BL      TFT_SendData
+        BL      SPI_SendByte
         LSRS    R0, R7, #8
-        BL      TFT_SendData
+        BL      SPI_SendByte
         AND     R0, R7, #0xFF
-        BL      TFT_SendData
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
 
+        BL      TFT_BeginCommand
         MOVS    R0, #ILI9341_RAMWR
-        BL      TFT_SendCommand
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
 
-        POP     {R4, R5, R6, R7, LR}
-        BX      LR
-        ENDFUNC
+        POP     {R4-R7, PC}
 
-; =====================================================================
-; TFT_Reset
-; =====================================================================
-TFT_Reset FUNCTION
+TFT_WriteReg1
+        PUSH    {R4, R5, LR}
+        MOV     R4, R0
+        MOV     R5, R1
+
+        BL      TFT_BeginCommand
+        MOV     R0, R4
+        BL      SPI_SendByte
+        BL      TFT_SwitchToData
+        MOV     R0, R5
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
+
+        POP     {R4, R5, PC}
+
+TFT_WriteReg2
+        PUSH    {R4-R6, LR}
+        MOV     R4, R0
+        MOV     R5, R1
+        MOV     R6, R2
+
+        BL      TFT_BeginCommand
+        MOV     R0, R4
+        BL      SPI_SendByte
+        BL      TFT_SwitchToData
+        MOV     R0, R5
+        BL      SPI_SendByte
+        MOV     R0, R6
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
+
+        POP     {R4-R6, PC}
+
+TFT_WriteReg3
+        PUSH    {R4-R7, LR}
+        MOV     R4, R0
+        MOV     R5, R1
+        MOV     R6, R2
+        MOV     R7, R3
+
+        BL      TFT_BeginCommand
+        MOV     R0, R4
+        BL      SPI_SendByte
+        BL      TFT_SwitchToData
+        MOV     R0, R5
+        BL      SPI_SendByte
+        MOV     R0, R6
+        BL      SPI_SendByte
+        MOV     R0, R7
+        BL      SPI_SendByte
+        BL      TFT_EndTransaction
+
+        POP     {R4-R7, PC}
+
+TFT_Init
         PUSH    {LR}
 
-        MOVS    R0, #TFT_CS_PIN
-        BL      TFT_PinHighA
-        MOVS    R0, #TFT_RD_PIN
-        BL      TFT_PinHighA
-        MOVS    R0, #TFT_WR_PIN
-        BL      TFT_PinHighA
-        MOVS    R0, #TFT_RS_PIN
-        BL      TFT_PinHighA
-
-        MOVS    R0, #TFT_RST_PIN
-        BL      TFT_PinHighA
-        BL      TFT_Delay_Long
-
-        MOVS    R0, #TFT_RST_PIN
-        BL      TFT_PinLowA
-        BL      TFT_Delay_Long
-
-        MOVS    R0, #TFT_RST_PIN
-        BL      TFT_PinHighA
-        BL      TFT_Delay_Long
-
-        POP     {LR}
-        BX      LR
-        ENDFUNC
-
-; =====================================================================
-; TFT_Init
-; =====================================================================
-TFT_Init FUNCTION
-        PUSH    {LR}
-
-        BL      TFT_GPIO_Init
+        BL      TFT_GPIO_SPI_Init
         BL      TFT_Reset
 
         MOVS    R0, #ILI9341_SWRESET
         BL      TFT_SendCommand
-        BL      TFT_Delay_Long
+        LDR     R0, =TFT_DELAY_SWRESET
+        BL      TFT_Delay
 
         MOVS    R0, #ILI9341_SLPOUT
         BL      TFT_SendCommand
-        BL      TFT_Delay_Long
+        LDR     R0, =TFT_DELAY_SLPOUT
+        BL      TFT_Delay
 
         MOVS    R0, #ILI9341_FRMCTR1
-        BL      TFT_SendCommand
-        MOVS    R0, #0x00
-        BL      TFT_SendData
-        MOVS    R0, #0x18
-        BL      TFT_SendData
+        MOVS    R1, #0x00
+        MOVS    R2, #0x18
+        BL      TFT_WriteReg2
 
         MOVS    R0, #ILI9341_DFUNCTR
-        BL      TFT_SendCommand
-        MOVS    R0, #0x08
-        BL      TFT_SendData
-        MOVS    R0, #0x82
-        BL      TFT_SendData
-        MOVS    R0, #0x27
-        BL      TFT_SendData
+        MOVS    R1, #0x08
+        MOVS    R2, #0x82
+        MOVS    R3, #0x27
+        BL      TFT_WriteReg3
 
         MOVS    R0, #ILI9341_PWCTR1
-        BL      TFT_SendCommand
-        MOVS    R0, #0x23
-        BL      TFT_SendData
+        MOVS    R1, #0x23
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_PWCTR2
-        BL      TFT_SendCommand
-        MOVS    R0, #0x10
-        BL      TFT_SendData
+        MOVS    R1, #0x10
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_VMCTR1
-        BL      TFT_SendCommand
-        MOVS    R0, #0x3E
-        BL      TFT_SendData
-        MOVS    R0, #0x28
-        BL      TFT_SendData
+        MOVS    R1, #0x3E
+        MOVS    R2, #0x28
+        BL      TFT_WriteReg2
 
         MOVS    R0, #ILI9341_VMCTR2
-        BL      TFT_SendCommand
-        MOVS    R0, #0x86
-        BL      TFT_SendData
+        MOVS    R1, #0x86
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_GAMSET
-        BL      TFT_SendCommand
-        MOVS    R0, #0x01
-        BL      TFT_SendData
+        MOVS    R1, #0x01
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_MADCTL
-        BL      TFT_SendCommand
-        MOVS    R0, #0x48
-        BL      TFT_SendData
+        MOVS    R1, #0x28
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_PIXFMT
-        BL      TFT_SendCommand
-        MOVS    R0, #0x55
-        BL      TFT_SendData
+        MOVS    R1, #0x55
+        BL      TFT_WriteReg1
 
         MOVS    R0, #ILI9341_DISPON
         BL      TFT_SendCommand
-        BL      TFT_Delay_Long
+        LDR     R0, =TFT_DELAY_POST_DISPON
+        BL      TFT_Delay
 
-        POP     {LR}
-        BX      LR
-        ENDFUNC
+        POP     {PC}
 
+        ALIGN
         END
