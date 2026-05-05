@@ -1,14 +1,26 @@
 ; =====================================================================
 ; FILE: max30102.s
 ; DESCRIPTION:
-;   MAX30102 init + Burst Read + Direct Raw to Display (Diagnostic Live)
+;   MAX30102 init + FIFO read + temp read
+;
+; FIXES:
+;   - HR_Init reset wait has watchdog
+;   - HR_ReadTemp exists and has watchdog
+;   - exports g_temp_int / g_temp_frac
+;   - HR_ReadFIFO updates real g_hr_ir_raw for PPG wave
 ; =====================================================================
 
         INCLUDE constants.s
 
         AREA    HR_DATA, DATA, READWRITE
         ALIGN
-fifo_buf        SPACE   6           
+
+        EXPORT  g_temp_int
+        EXPORT  g_temp_frac
+
+fifo_buf        SPACE   6
+g_temp_int      SPACE   4
+g_temp_frac     SPACE   4
 
         AREA    HR_CODE, CODE, READONLY
         THUMB
@@ -18,7 +30,8 @@ fifo_buf        SPACE   6
         IMPORT  I2C_Init
         IMPORT  I2C_WriteReg
         IMPORT  I2C_ReadReg
-        IMPORT  I2C_Read6Bytes      
+        IMPORT  I2C_Read6Bytes
+
         IMPORT  g_hr_red_raw
         IMPORT  g_hr_ir_raw
         IMPORT  g_bpm
@@ -26,6 +39,7 @@ fifo_buf        SPACE   6
 
         EXPORT  HR_Init
         EXPORT  HR_ReadFIFO
+        EXPORT  HR_ReadTemp
 
 MAX30102_ADDR           EQU     0x57
 
@@ -44,12 +58,16 @@ REG_SPO2_CFG            EQU     0x0A
 REG_LED1_PA             EQU     0x0C
 REG_LED2_PA             EQU     0x0D
 
+REG_TEMP_INTR           EQU     0x1F
+REG_TEMP_FRAC           EQU     0x20
+REG_TEMP_CONFIG         EQU     0x21
+
 ; -------------------- Mode / config --------------------
 MODE_RESET              EQU     0x40
 MODE_SPO2               EQU     0x03
 SPO2_CFG_100SPS_18B     EQU     0x27
-FIFO_CFG_DEFAULT        EQU     0x10    ; Rollover enabled
-LED_PA_DEFAULT          EQU     0x24
+FIFO_CFG_DEFAULT        EQU     0x10
+LED_PA_DEFAULT          EQU     0x1F
 
 RAW18_MASK              EQU     0x0003FFFF
 FIFO_PTR_MASK           EQU     0x1F
@@ -64,18 +82,27 @@ HR_Init
 
         MOVS    R4, #MAX30102_ADDR
 
+        ; reset device
         MOV     R0, R4
         MOVS    R1, #REG_MODE_CFG
         MOVS    R2, #MODE_RESET
         BL      I2C_WriteReg
+
+        ; wait reset bit clears, with watchdog
+        LDR     R5, =50000
 
 HRI_WaitResetDone
         MOV     R0, R4
         MOVS    R1, #REG_MODE_CFG
         BL      I2C_ReadReg
         TST     R0, #MODE_RESET
+        BEQ     HRI_ResetDone
+
+        SUBS    R5, R5, #1
         BNE     HRI_WaitResetDone
 
+HRI_ResetDone
+        ; disable interrupts
         MOV     R0, R4
         MOVS    R1, #REG_INT_ENABLE1
         MOVS    R2, #0
@@ -86,6 +113,7 @@ HRI_WaitResetDone
         MOVS    R2, #0
         BL      I2C_WriteReg
 
+        ; clear FIFO pointers
         MOV     R0, R4
         MOVS    R1, #REG_FIFO_WR_PTR
         MOVS    R2, #0
@@ -101,16 +129,19 @@ HRI_WaitResetDone
         MOVS    R2, #0
         BL      I2C_WriteReg
 
+        ; FIFO config
         MOV     R0, R4
         MOVS    R1, #REG_FIFO_CFG
         MOVS    R2, #FIFO_CFG_DEFAULT
         BL      I2C_WriteReg
 
+        ; SpO2 config
         MOV     R0, R4
         MOVS    R1, #REG_SPO2_CFG
         MOVS    R2, #SPO2_CFG_100SPS_18B
         BL      I2C_WriteReg
 
+        ; LEDs
         MOV     R0, R4
         MOVS    R1, #REG_LED1_PA
         MOVS    R2, #LED_PA_DEFAULT
@@ -121,13 +152,16 @@ HRI_WaitResetDone
         MOVS    R2, #LED_PA_DEFAULT
         BL      I2C_WriteReg
 
+        ; SpO2 mode
         MOV     R0, R4
         MOVS    R1, #REG_MODE_CFG
         MOVS    R2, #MODE_SPO2
         BL      I2C_WriteReg
 
-        LDR     R0, =g_hr_red_raw
+        ; clear globals
         MOVS    R1, #0
+
+        LDR     R0, =g_hr_red_raw
         STR     R1, [R0]
 
         LDR     R0, =g_hr_ir_raw
@@ -139,7 +173,67 @@ HRI_WaitResetDone
         LDR     R0, =g_spo2
         STR     R1, [R0]
 
+        LDR     R0, =g_temp_int
+        STR     R1, [R0]
+
+        LDR     R0, =g_temp_frac
+        STR     R1, [R0]
+
         POP     {R4-R7, PC}
+
+; =====================================================================
+; HR_ReadTemp
+; Reads MAX30102 die temperature.
+; This is NOT body temperature.
+; g_temp_frac is in 1/16 C units.
+; =====================================================================
+HR_ReadTemp
+        PUSH    {R4-R6, LR}
+
+        MOVS    R4, #MAX30102_ADDR
+
+        ; start one-shot temperature conversion
+        MOV     R0, R4
+        MOVS    R1, #REG_TEMP_CONFIG
+        MOVS    R2, #1
+        BL      I2C_WriteReg
+
+        ; wait until TEMP_CONFIG bit0 clears, with watchdog
+        LDR     R5, =40000
+
+HRT_WaitDone
+        MOV     R0, R4
+        MOVS    R1, #REG_TEMP_CONFIG
+        BL      I2C_ReadReg
+        TST     R0, #1
+        BEQ     HRT_ReadValues
+
+        SUBS    R5, R5, #1
+        BNE     HRT_WaitDone
+
+        ; timeout: keep old displayed temperature, do not freeze
+        B       HRT_Exit
+
+HRT_ReadValues
+        ; integer part
+        MOV     R0, R4
+        MOVS    R1, #REG_TEMP_INTR
+        BL      I2C_ReadReg
+        UXTB    R0, R0
+        LDR     R1, =g_temp_int
+        STR     R0, [R1]
+
+        ; fractional part
+        MOV     R0, R4
+        MOVS    R1, #REG_TEMP_FRAC
+        BL      I2C_ReadReg
+        UXTB    R0, R0
+        AND     R0, R0, #0x0F
+        LDR     R1, =g_temp_frac
+        STR     R0, [R1]
+
+HRT_Exit
+        POP     {R4-R6, PC}
 
 ; =====================================================================
 ; HR_ReadFIFO
@@ -149,6 +243,7 @@ HR_ReadFIFO
 
         MOVS    R4, #MAX30102_ADDR
 
+        ; check FIFO has new sample
         MOV     R0, R4
         MOVS    R1, #REG_FIFO_WR_PTR
         BL      I2C_ReadReg
@@ -162,89 +257,86 @@ HR_ReadFIFO
         CMP     R6, R7
         BEQ     HRF_Exit
 
+        ; read 6 bytes: RED[0..2], IR[3..5]
         MOV     R0, R4
         MOVS    R1, #REG_FIFO_DATA
         LDR     R2, =fifo_buf
         BL      I2C_Read6Bytes
+        CMP     R0, #0
+        BNE     HRF_Exit
 
-        ; ==========================================================
-        ; Construct RED sample (bytes 0, 1, 2)
-        ; ==========================================================
+        ; RED sample
         LDR     R7, =fifo_buf
-        
+
         LDRB    R5, [R7, #0]
-        LSL     R5, R5, #16
-        
+        LSLS    R5, R5, #16
+
         LDRB    R0, [R7, #1]
-        LSL     R0, R0, #8
+        LSLS    R0, R0, #8
         ORR     R5, R5, R0
-        
+
         LDRB    R0, [R7, #2]
         ORR     R5, R5, R0
 
         LDR     R0, =RAW18_MASK
         AND     R5, R5, R0
-        
+
         LDR     R0, =g_hr_red_raw
         STR     R5, [R0]
 
-        ; ==========================================================
-        ; Construct IR sample (bytes 3, 4, 5)
-        ; ==========================================================
+        ; IR sample
         LDRB    R6, [R7, #3]
-        LSL     R6, R6, #16
-        
+        LSLS    R6, R6, #16
+
         LDRB    R0, [R7, #4]
-        LSL     R0, R0, #8
+        LSLS    R0, R0, #8
         ORR     R6, R6, R0
-        
+
         LDRB    R0, [R7, #5]
         ORR     R6, R6, R0
 
         LDR     R0, =RAW18_MASK
         AND     R6, R6, R0
-        
+
         LDR     R0, =g_hr_ir_raw
         STR     R6, [R0]
 
-        ; ==========================================================
-        ; DIRECT DISPLAY VARIABLES
-        ; ==========================================================
-
-        ; --- 1. Finger Detection (?????? ???? ??????) ---
-        LDR     R0, =40000          ; ???? ?????? ?? ???? ????
+        ; finger detection
+        MOVW    R0, #40000
         CMP     R6, R0
-        BLO     HRF_No_Finger       ; ??? ???? ??????? ???? ???? ?????? ?????
+        BLO     HRF_No_Finger
 
-        ; --- 2. BPM diagnostic (Realistic Human Range 70-101 BPM) ---
-        LSRS    R1, R5, #12         ; ????? ??????? ????? ?????? ??? ?????
-        MOVS    R2, #31             ; ??? ????????? ????????? ?? ??? ??? 0 ? 31
+        ; diagnostic BPM range 70..101
+        LSRS    R1, R5, #12
+        MOVS    R2, #31
         AND     R1, R1, R2
-        ADDS    R1, R1, #70         ; ??? 70 ??? ???? ?????? ?????
+        ADDS    R1, R1, #70
         LDR     R0, =g_bpm
         STR     R1, [R0]
 
-        ; --- 3. SpO2 approximate percentage ---
+        ; rough SpO2 approximation
+        CMP     R6, #0
+        BEQ     HRF_No_Finger
+
         MOV     R1, R5
-        LSLS    R1, R1, #8          ; ratio_q8 numerator = RED * 256
-        UDIV    R1, R1, R6          ; ratio_q8 = (RED / IR) * 256
+        LSLS    R1, R1, #8
+        UDIV    R1, R1, R6
 
         MOVS    R2, #25
         MUL     R1, R1, R2
-        LSRS    R1, R1, #8          ; (25 * ratio_q8) / 256
+        LSRS    R1, R1, #8
 
         LDR     R2, =110
         CMP     R1, R2
-        BHI     HRF_No_Finger       ; ????? ????? ????????? ????
+        BHI     HRF_No_Finger
 
-        SUBS    R1, R2, R1          ; spo2 = 110 - 25*(RED/IR)
+        SUBS    R1, R2, R1
 
-        ; --- Clamping (??? ?????? ??? 70 ? 100) ---
         CMP     R1, #70
-        BHS     HRF_Spo2_ClampHigh
+        BHS     HRF_Spo2_Floor_OK
         MOVS    R1, #70
 
-HRF_Spo2_ClampHigh
+HRF_Spo2_Floor_OK
         CMP     R1, #100
         BLS     HRF_Spo2_Store
         MOVS    R1, #100
@@ -254,15 +346,15 @@ HRF_Spo2_Store
         STR     R1, [R0]
         B       HRF_Exit
 
-        ; --- ???? ??? ???? ???? ---
 HRF_No_Finger
-        MOVS    R1, #0              ; ????? ??????
+        MOVS    R1, #0
         LDR     R0, =g_spo2
-        STR     R1, [R0]            ; ??? ???? ???????? 0
+        STR     R1, [R0]
         LDR     R0, =g_bpm
-        STR     R1, [R0]            ; ??? ????? ????? 0 ?????
+        STR     R1, [R0]
 
 HRF_Exit
         POP     {R4-R7, PC}
 
+        ALIGN
         END

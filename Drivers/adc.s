@@ -1,14 +1,19 @@
 ;=============================================================================
 ; adc.s
-; ADC1 driver – STM32F401RC
+; ADC1 driver - STM32F401RC
 ;
 ; Exports:
-;   ADC_Init  – enable clocks, configure PA0 and PA1 as analog, power ADC1 on
-;   ADC_Read  – R0 = channel number in, R0 = 12-bit result out
+;   ADC_Init  - enable clocks, configure PA0 and PA1 as analog, power ADC1 on
+;   ADC_Read  - R0 = channel number in, R0 = 12-bit result out
 ;
 ; Hardware:
 ;   PA0  -> ADC1_IN0  (breathing sensor, SNS_BREATH_ADC = 0)
 ;   PA1  -> ADC1_IN1  (MQ2 smoke sensor, SNS_SMOKE_ADC  = 1)
+;
+; FIX:
+;   - ADC_Read now has timeout in ADC_WaitEOC
+;   - If ADC fails, returns 4095 instead of freezing forever
+;   - 4095 is safer for smoke logic where clean air = high ADC
 ;=============================================================================
 
         AREA    ADC_CODE, CODE, READONLY
@@ -21,6 +26,7 @@
         EXPORT  ADC_Init
         EXPORT  ADC_Read
 
+ADC_TIMEOUT_COUNT       EQU     100000
 
 ;=============================================================================
 ; ADC_Init
@@ -44,8 +50,8 @@ ADC_Init
         ; PA1 MODER[3:2] = 11
         LDR     R0, =GPIOA_BASE
         LDR     R1, [R0, #GPIO_MODER]
-        BIC     R1, R1, #0x0000000F    ; clear PA0 + PA1 mode bits
-        ORR     R1, R1, #0x0000000F    ; set PA0 + PA1 to analog
+        BIC     R1, R1, #0x0000000F
+        ORR     R1, R1, #0x0000000F
         STR     R1, [R0, #GPIO_MODER]
 
         ; ---- 4. CR1: 12-bit resolution ----
@@ -65,7 +71,7 @@ ADC_Init
         ; ch1 bits [5:3] = 101
         LDR     R1, [R0, #ADC_SMPR2]
         BIC     R1, R1, #0x0000003F
-        ORR     R1, R1, #0x0000002D    ; ch0=101, ch1=101
+        ORR     R1, R1, #0x0000002D
         STR     R1, [R0, #ADC_SMPR2]
 
         ; ---- 7. SQR1: sequence length = 1 ----
@@ -81,6 +87,7 @@ ADC_Init
 
         ; Stabilization delay
         LDR     R2, =1000
+
 ADC_StabDelay
         SUBS    R2, R2, #1
         BNE     ADC_StabDelay
@@ -90,9 +97,17 @@ ADC_StabDelay
 
 ;=============================================================================
 ; ADC_Read
+; IN:
+;   R0 = ADC channel number
+;
+; OUT:
+;   R0 = 12-bit ADC value
+;
+; Fail-safe:
+;   If EOC never becomes ready, returns 4095 instead of freezing.
 ;=============================================================================
 ADC_Read
-        PUSH    {R1, R2, LR}
+        PUSH    {R1, R2, R3, LR}
 
         LDR     R1, =ADC1_BASE
 
@@ -114,17 +129,29 @@ ADC_Read
         ORR     R2, R2, R0
         STR     R2, [R1, #ADC_CR2]
 
+        ; ---- 4. Wait EOC with timeout ----
+        LDR     R3, =ADC_TIMEOUT_COUNT
+
 ADC_WaitEOC
         LDR     R2, [R1, #ADC_SR]
         TST     R2, #ADC_SR_EOC
-        BEQ     ADC_WaitEOC
+        BNE     ADC_Read_Result
 
-        ; ---- 4. Read result ----
+        SUBS    R3, R3, #1
+        BNE     ADC_WaitEOC
+
+        ; Timeout fail-safe:
+        ; return max ADC value instead of hanging forever.
+        LDR     R0, =0x00000FFF
+        POP     {R1, R2, R3, PC}
+
+ADC_Read_Result
+        ; ---- 5. Read result ----
         LDR     R0, [R1, #ADC_DR]
         LDR     R2, =0x00000FFF
         AND     R0, R0, R2
 
-        POP     {R1, R2, PC}
+        POP     {R1, R2, R3, PC}
 
         ALIGN
         END

@@ -1,6 +1,6 @@
 ;=============================================================================
 ; constants.s
-; INCLUDE-ONLY file – use with: GET constants.s
+; INCLUDE-ONLY file ? use with: GET constants.s
 ;=============================================================================
 
 ;-----------------------------------------------------------------------------
@@ -12,14 +12,14 @@ RCC_APB1ENR         EQU     0x40
 RCC_APB2ENR         EQU     0x44
 
 ;-----------------------------------------------------------------------------
-; GPIO – base addresses
+; GPIO ? base addresses
 ;-----------------------------------------------------------------------------
 GPIOA_BASE          EQU     0x40020000
 GPIOB_BASE          EQU     0x40020400
 GPIOC_BASE          EQU     0x40020800
 
 ;-----------------------------------------------------------------------------
-; GPIO – register offsets
+; GPIO ? register offsets
 ;-----------------------------------------------------------------------------
 GPIO_MODER          EQU     0x00
 GPIO_OTYPER         EQU     0x04
@@ -52,7 +52,7 @@ BIT14               EQU     0x00004000
 BIT15               EQU     0x00008000
 
 ;-----------------------------------------------------------------------------
-; TFT – SPI ILI9341
+; TFT ? SPI ILI9341
 ;-----------------------------------------------------------------------------
 TFT_CS_PIN          EQU     0
 TFT_DC_PIN          EQU     1
@@ -155,6 +155,10 @@ STATE_MED_INPUT     EQU     6
 STATE_MED_DISPENSE  EQU     7
 STATE_SMOKE_ALERT   EQU     8
 STATE_MED_WAITING   EQU     9
+STATE_TEMP          EQU     10
+STATE_PPG_WAVE      EQU     11
+STATE_VISION        EQU     12
+STATE_VISION_RES    EQU     13
 
 STATE_INVALID       EQU     0xFFFFFFFF
 
@@ -187,6 +191,10 @@ KEY_A               EQU     11
 KEY_B               EQU     12
 KEY_C               EQU     13
 KEY_D               EQU     14
+KEY_UP              EQU     15
+KEY_DOWN            EQU     16
+KEY_LEFT            EQU     17
+KEY_RIGHT           EQU     18
 
 ;-----------------------------------------------------------------------------
 ; IR pin map
@@ -197,30 +205,27 @@ IR_PIN              EQU     10
 
 ;-----------------------------------------------------------------------------
 ; IR command bytes only
-; IMPORTANT:
-; g_ir_raw_code will carry ONLY the NEC command byte, not the full 32-bit word.
-; This makes the code more tolerant if your remote has a different address byte.
 ;-----------------------------------------------------------------------------
-IR_CODE_0           EQU     0x4A
-IR_CODE_1           EQU     0x68
-IR_CODE_2           EQU     0x98
-IR_CODE_3           EQU     0xB0
-IR_CODE_4           EQU     0x30
-IR_CODE_5           EQU     0x18
-IR_CODE_6           EQU     0x7A
-IR_CODE_7           EQU     0x10
-IR_CODE_8           EQU     0x38
-IR_CODE_9           EQU     0x5A
+IR_CODE_0           EQU     0x19      ; decimal 25
+IR_CODE_1           EQU     0x45      ; decimal 69
+IR_CODE_2           EQU     0x46      ; decimal 70
+IR_CODE_3           EQU     0x47      ; decimal 71
+IR_CODE_4           EQU     0x44      ; decimal 68
+IR_CODE_5           EQU     0x40      ; decimal 64
+IR_CODE_6           EQU     0x43      ; decimal 67
+IR_CODE_7           EQU     0x07      ; decimal 7
+IR_CODE_8           EQU     0x15      ; decimal 21
+IR_CODE_9           EQU     0x09      ; decimal 9
 
-IR_CODE_OK          EQU     0x02
-IR_CODE_CLR         EQU     0x42      ; *
-IR_CODE_BACK        EQU     0x52      ; #
-IR_CODE_EXIT        EQU     0xA8      ; Down
+IR_CODE_OK          EQU     0x1C      ; decimal 28 / OK
+IR_CODE_CLR         EQU     0x16      ; decimal 22 / *
+IR_CODE_BACK        EQU     0x0D      ; decimal 13 / #
+IR_CODE_EXIT        EQU     0x02      ; decimal 2 / Down
 
-IR_CODE_UP          EQU     0x62
-IR_CODE_LEFT        EQU     0x22
-IR_CODE_RIGHT       EQU     0xC2
-IR_CODE_DOWN        EQU     0xA8
+IR_CODE_UP          EQU     0x18      ; optional
+IR_CODE_LEFT        EQU     0x08      ; optional
+IR_CODE_RIGHT       EQU     0x5A      ; optional
+IR_CODE_DOWN        EQU     0x02      ; decimal 2
 
 ;-----------------------------------------------------------------------------
 ; SYSCFG / EXTI / NVIC for IR interrupt
@@ -252,5 +257,99 @@ TIM_PSC             EQU     0x28
 TIM_ARR             EQU     0x2C
 TIM_EGR             EQU     0x14
 
+
+;-----------------------------------------------------------------------------
+; Sanitizing pump / hand sensor
+;-----------------------------------------------------------------------------
+SAN_GPIO_PORT        EQU     GPIOA_BASE
+SAN_SENSOR_PIN       EQU     4
+SAN_RELAY_PIN        EQU     5
+SAN_PUMP_DELAY       EQU     200000
+
+;-----------------------------------------------------------------------------
+; Bluetooth / USART2
+;-----------------------------------------------------------------------------
+BT_USART2_BASE          EQU     0x40004400
+
+BT_USART_SR             EQU     0x00
+BT_USART_DR             EQU     0x04
+BT_USART_BRR            EQU     0x08
+BT_USART_CR1            EQU     0x0C
+BT_USART_CR2            EQU     0x10
+BT_USART_CR3            EQU     0x14
+
+BT_USART_SR_RXNE        EQU     0x00000020
+BT_USART_SR_TXE         EQU     0x00000080
+
+BT_USART_CR1_RE         EQU     0x00000004
+BT_USART_CR1_TE         EQU     0x00000008
+BT_USART_CR1_UE         EQU     0x00002000
+
+; USART2 clock is RCC_APB1ENR bit 17
+BT_RCC_USART2_EN        EQU     0x00020000
+BT_USART2_BRR_9600      EQU     0x00000683
+
+BT_TX_PIN               EQU     2       ; PA2
+BT_RX_PIN               EQU     3       ; PA3
+BT_USART_AF             EQU     7       ; AF7 = USART2
+
+; PA2/PA3 MODER mask and value for alternate function mode
+BT_GPIOA_PA2_PA3_MODER_MASK EQU 0x000000F0
+BT_GPIOA_PA2_PA3_MODER_AF   EQU 0x000000A0
+
+; PA2/PA3 AFRL mask/value, AF7 on both pins
+BT_GPIOA_PA2_PA3_AFRL_MASK  EQU 0x0000FF00
+BT_GPIOA_PA2_PA3_AFRL_AF7   EQU 0x00007700
+
+; Pull-up only on RX PA3. PA2 stays no-pull.
+BT_GPIOA_PA2_PA3_PUPD_MASK  EQU 0x000000F0
+BT_GPIOA_PA3_PULLUP         EQU 0x00000040
+
+; Medium/high output speed for PA2/PA3
+BT_GPIOA_PA2_PA3_SPEED_MASK EQU 0x000000F0
+BT_GPIOA_PA2_PA3_SPEED_FAST EQU 0x000000A0
+
+; RX/TX buffers
+BT_RX_BUFFER_SIZE       EQU     80
+BT_RX_LAST_INDEX        EQU     79
+BT_TX_BUFFER_SIZE       EQU     192
+BT_TX_LAST_INDEX        EQU     191
+BT_NUM_BUFFER_SIZE      EQU     12
+
+; ASCII
+BT_ASCII_CR             EQU     13
+BT_ASCII_LF             EQU     10
+BT_ASCII_0              EQU     48
+
+; Bluetooth logic states
+BT_MODE_LINE            EQU     1
+BT_MODE_PHONE           EQU     2
+BT_DIR_FWD              EQU     1
+BT_DIR_BACK             EQU     2
+BT_DIR_LEFT             EQU     3
+BT_DIR_RIGHT            EQU     4
+BT_DIR_STOP             EQU     5
+
+BT_REPORT_PERIOD_MS     EQU     250
+BT_PATIENT_ID_TEXT      EQU     001
+
+;-----------------------------------------------------------------------------
+; Motion Control (Phone Override)
+;-----------------------------------------------------------------------------
+MOTION_MODE_LINE        EQU     1
+MOTION_MODE_PHONE       EQU     2
+
+PHONE_DIR_STOP          EQU     5
+PHONE_DIR_FWD           EQU     1
+PHONE_DIR_BACK          EQU     2
+PHONE_DIR_LEFT          EQU     3
+PHONE_DIR_RIGHT         EQU     4
+
+PHONE_TIMEOUT_MS        EQU     2000
+
+PHONE_SPEED             EQU     340
+PHONE_TURN_FAST         EQU     480
+PHONE_TURN_SLOW         EQU     280
+PHONE_PIVOT_SPEED       EQU     300
 
         END

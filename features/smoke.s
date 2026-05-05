@@ -2,10 +2,12 @@
 ; smoke.s
 ; Smoke detection logic – reads MQ2 via ADC, updates alarm flag.
 ;
-; FIXED VERSION:
-;   - ignores first warm-up iterations
-;   - requires consecutive high readings before setting smoke alert
-;   - uses lower clear threshold (hysteresis) to avoid flicker
+; FIX FOR YOUR SENSOR:
+;   - assumes clean air = lower ADC
+;   - smoke = higher ADC
+;   - warm-up ignore
+;   - confirmation counter
+;   - hysteresis
 ;=============================================================================
 
         AREA    SMOKE_DATA, DATA, READWRITE
@@ -29,20 +31,16 @@ smoke_high_counter      SPACE   4
 
 ;-----------------------------------------------------------------------------
 ; Tunable thresholds
+; clean air  -> lower ADC
+; smoke      -> higher ADC
 ;-----------------------------------------------------------------------------
-SMOKE_THRESHOLD_SET     EQU    500    ; set alert if >= this
-SMOKE_THRESHOLD_CLEAR   EQU     3200    ; clear alert only if < this
-SMOKE_WARMUP_COUNT      EQU     300     ; ignore first iterations after startup
-SMOKE_CONFIRM_COUNT     EQU     8       ; require 8 consecutive highs
+SMOKE_THRESHOLD_SET     EQU     3000    ; smoke if reading >= this
+SMOKE_THRESHOLD_CLEAR   EQU     3200    ; clear only if reading < this
+SMOKE_WARMUP_COUNT      EQU     300
+SMOKE_CONFIRM_COUNT     EQU     8
 
 ;=============================================================================
 ; Smoke_Check
-;
-; 1. Warm-up ignore at startup
-; 2. Read PA1 / ADC1_IN1
-; 3. Store latest value in g_smoke_level
-; 4. Require repeated high readings before setting smoke alert
-; 5. Use hysteresis to clear alert
 ;=============================================================================
 Smoke_Check
         PUSH    {R2-R7, LR}
@@ -60,7 +58,7 @@ Smoke_Check
         STR     R1, [R0]
 
         ; during warm-up: still read/store smoke level, but force flag clear
-        MOV     R0, #SNS_SMOKE_ADC
+        MOVS    R0, #SNS_SMOKE_ADC
         BL      ADC_Read
 
         LDR     R1, =g_smoke_level
@@ -71,7 +69,7 @@ Smoke_Check
         BIC     R2, R2, #Smoke_Alert_Flag
         STR     R2, [R1]
 
-        ; reset consecutive-high counter too
+        ; reset consecutive-high counter
         LDR     R1, =smoke_high_counter
         MOVS    R2, #0
         STR     R2, [R1]
@@ -82,10 +80,10 @@ Smoke_Check
 ; 2) Real read after warm-up
 ; ------------------------------------------------------------
 Smoke_DoRead
-        MOV     R0, #SNS_SMOKE_ADC
+        MOVS    R0, #SNS_SMOKE_ADC
         BL      ADC_Read               ; R0 = ADC value
 
-        ; store latest reading
+        ; store raw latest reading
         LDR     R1, =g_smoke_level
         STR     R0, [R1]
 
@@ -94,25 +92,27 @@ Smoke_DoRead
         LDR     R6, [R5]
 
         ; ------------------------------------------------------------
-        ; 3) If smoke alert already active, clear only below lower threshold
+        ; 3) If alert already active:
+        ;    clear only when reading goes back LOW enough
         ; ------------------------------------------------------------
         TST     R6, #Smoke_Alert_Flag
         BEQ     Smoke_CheckSetPath
 
         LDR     R3, =SMOKE_THRESHOLD_CLEAR
         CMP     R0, R3
-        BLO     Smoke_ClearAlarm
+        BLO     Smoke_ClearAlarm       ; clear when ADC < clear threshold
 
         ; keep alert active
         B       Smoke_Done
 
 ; ------------------------------------------------------------
-; 4) If smoke alert not active, require consecutive highs to set
+; 4) If alert not active:
+;    require repeated HIGH readings to set smoke alert
 ; ------------------------------------------------------------
 Smoke_CheckSetPath
         LDR     R3, =SMOKE_THRESHOLD_SET
         CMP     R0, R3
-        BLO     Smoke_ResetCounterOnly
+        BLO     Smoke_ResetCounterOnly ; below set threshold => still normal air
 
         ; value is high -> increment counter
         LDR     R1, =smoke_high_counter
@@ -130,7 +130,7 @@ Smoke_CheckSetPath
         B       Smoke_Done
 
 ; ------------------------------------------------------------
-; 5) Below set threshold while not active -> just reset counter
+; 5) Normal reading while not active -> reset counter
 ; ------------------------------------------------------------
 Smoke_ResetCounterOnly
         LDR     R1, =smoke_high_counter
@@ -145,7 +145,6 @@ Smoke_ClearAlarm
         BIC     R6, R6, #Smoke_Alert_Flag
         STR     R6, [R5]
 
-        ; also reset consecutive-high counter
         LDR     R1, =smoke_high_counter
         MOVS    R2, #0
         STR     R2, [R1]

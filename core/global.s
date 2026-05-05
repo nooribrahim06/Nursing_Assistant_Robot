@@ -18,6 +18,14 @@
         EXPORT  g_hr_red_raw
         EXPORT  g_hr_ir_raw
         EXPORT  g_motion_state
+        
+        EXPORT  g_motion_mode
+        ; --- Vision Test globals (UPDATED) ---
+        EXPORT  g_vision_level
+        EXPORT  g_vision_ring_idx
+        EXPORT  g_vision_level_score
+        EXPORT  g_vision_results
+        EXPORT  g_vision_dirs
 
         ; --- Heart-only processing globals ---
         EXPORT  g_hr_sample_count
@@ -82,5 +90,13 @@ g_snooze_cnt            SPACE   4
 
 ; --- Motion / actuation globals ---
 g_motion_state          SPACE   4
+
+g_motion_mode           SPACE   4       ; 1=LINE, 2=PHONE
+; --- Vision Test globals (UPDATED) ---
+g_vision_level          SPACE   4   ; 0 to 4 (5 levels)
+g_vision_ring_idx       SPACE   4   ; 0 to 2 (3 rings per level)
+g_vision_level_score    SPACE   4   ; 0 to 3 (correct answers this level)
+g_vision_results        SPACE   16  ; Stores right/wrong for rings
+g_vision_dirs           SPACE   16  ; Stores direction for rings
 
         END
