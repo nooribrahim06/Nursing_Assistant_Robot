@@ -199,7 +199,7 @@ INIT
  │
  ▼
 ┌─────────────────────────────────────┐
-│           MAIN LOOP (while 1)        │
+│          MAIN LOOP (while 1)        │
 │                                     │
 │  1. Read IR input                   │
 │  2. Read sensors (ADC, I2C, GPIO)   │
@@ -497,7 +497,7 @@ STR     R5, [R4]            ; Save new position state
 
 **Files:** `sanitizing.s`
 
-> ✍️ *One sentence: what does this feature do?*
+An automated, contactless hand sterilization system triggered by an IR proximity sensor to ensure hygiene.
 
 **How it works:**
 
@@ -510,7 +510,31 @@ STR     R5, [R4]            ; Save new position state
 **Key code:**
 
 ```assembly
-; ✍️ Paste your sensor read + pump on/off code here
+; Read sensor input (Active-Low)
+LDR     R0, =SAN_GPIO_PORT
+LDR     R1, [R0, #OFF_GPIO_IDR]
+TST     R1, #(1 << SAN_SENSOR_PIN)
+BEQ     SAN_PumpOn
+
+; No hand => pump OFF
+LDR     R1, [R0, #OFF_GPIO_ODR]
+LDR     R2, =(1 << SAN_RELAY_PIN)
+BIC     R1, R1, R2                  ; Clear relay pin to turn off
+STR     R1, [R0, #OFF_GPIO_ODR]
+B       SAN_Exit
+
+SAN_PumpOn
+; Hand detected => pump ON
+LDR     R1, [R0, #OFF_GPIO_ODR]
+LDR     R2, =(1 << SAN_RELAY_PIN)
+ORR     R1, R1, R2                  ; Set relay pin to turn on
+STR     R1, [R0, #OFF_GPIO_ODR]
+
+; Fixed delay for dispensing
+LDR     R2, =SAN_PUMP_DELAY
+SAN_DelayLoop
+SUBS    R2, R2, #1
+BNE     SAN_DelayLoop
 ```
 
 > ⚠️ *No Proteus simulation for this feature — hardware only.*
