@@ -445,4 +445,5 @@ Motion_Right
 
 
         ALIGN
-        END
+        END ; END
+        
