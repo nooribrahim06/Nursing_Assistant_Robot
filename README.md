@@ -408,7 +408,7 @@ ILI9341    ←  physical display
 
 **Files:** `medicine.s`, `buzzer.s`, `ui_state.s`
 
-> ✍️ *One sentence: what does this feature do?*
+> A smart medicine dispenser that runs seamlessly in the background, using hardware PWM to deliver precise doses without freezing the robot's main tasks.
 
 **How it works:**
 
@@ -425,7 +425,16 @@ ILI9341    ←  physical display
 **Key code:**
 
 ```assembly
-; ✍️ Paste your countdown logic or servo step-rotation code here
+; --- Positional Servo Step-Rotation Logic ---
+; Advances the servo index (0 -> 1 -> 2 -> 0) mapped to (0° -> 90° -> 180° -> 0°)
+LDR     R4, =med_servo_pos_index
+LDR     R5, [R4]
+ADDS    R5, R5, #1          ; Increment position step
+CMP     R5, #3              ; Check boundary (max 3 states)
+BNE     MSD_SetPulse
+MOVS    R5, #0              ; Reset to 0° if cycle is complete
+MSD_SetPulse
+STR     R5, [R4]            ; Save new position state
 ```
 
 **Simulation:**
