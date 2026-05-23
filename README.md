@@ -1,8 +1,27 @@
-# 🤖 Nursing Assistant Robot
+# 🤖 Robo — The Nurse Assistant
 
 ![Assembled Robot](imgs/Robo.jpg)
 
 > An autonomous clinical assistance robot written entirely in **ARM Assembly (Thumb-2)** targeting the **STM32F401RC** microcontroller. Designed to navigate hospital corridors, monitor patient vitals, sanitise hands, and dispense medications—programmed at the bare-metal register level with no HAL, CMSIS, or OS libraries.
+
+---
+
+### 🎓 Project Info
+
+**Microprocessors Final Project** — Cairo University, Faculty of Engineering, Computer Engineering Department
+
+| # | Name |
+|---|------|
+| 1 | Nour Ibrahim |
+| 2 | Youmna Mohamed |
+| 3 | Yehia Mahmoud |
+| 4 | Yasmine Ismail |
+| 5 | Yassin Abdelatty |
+| 6 | Mostafa El Shazly |
+| 7 | Moaz Amr |
+| 8 | Anton Azer |
+| 9 | Maryam Gamal |
+| 10 | Hashem Mohamed |
 
 ---
 
