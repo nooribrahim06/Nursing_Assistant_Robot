@@ -1,6 +1,6 @@
 # 🤖 Nursing Assistant Robot
 
-![Assembled Robot](imgs/robot1.jpg)
+![Assembled Robot](imgs/robo.jpg)
 
 > An autonomous clinical assistance robot written entirely in **ARM Assembly (Thumb-2)** targeting the **STM32F401RC** microcontroller. Designed to navigate hospital corridors, monitor patient vitals, sanitise hands, and dispense medications—programmed at the bare-metal register level with no HAL, CMSIS, or OS libraries.
 
