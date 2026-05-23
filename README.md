@@ -620,6 +620,9 @@ STR     R5, [R4]            ; Save new position state
 ### Simulation — Draw Image on TFT
 ![draw image](examples%20for%20Proteus/Drawing%20Image/drawingImage.png)
 
+### Simulation — External IR Station Circuit
+![IR Station Circuit](imgs/ir_station_sim.jpg)
+
 ### Hardware
 ![Real Robot Hardware 1](imgs/robot1.jpg)
 ![Real Robot Hardware 2](imgs/robot2.jpg)
