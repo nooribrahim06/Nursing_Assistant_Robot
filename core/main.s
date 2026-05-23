@@ -9,6 +9,7 @@ ir_last_ui_code         SPACE   4
 ir_last_ui_tick         SPACE   4
 temp_last_read_tick     SPACE   4
 main_prev_state         SPACE   4
+ui_last_draw_tick       SPACE   4
 
         AREA    MAIN_CODE, CODE, READONLY
         THUMB
@@ -41,6 +42,7 @@ main_prev_state         SPACE   4
 
         IMPORT  TFT_Init
         IMPORT  ADC_Init
+        IMPORT  ADC_AWD_Init
         IMPORT  PWM_Init
         IMPORT  MED_Init
         IMPORT  Smoke_Check
@@ -56,6 +58,8 @@ main_prev_state         SPACE   4
         IMPORT  MotionBT_Init
         IMPORT  MotionBT_SetMode
         IMPORT  MotionBT_ApplyDirection
+        IMPORT  HCSR04_Init
+        IMPORT  HCSR04_Read
 
         IMPORT  g_bt_cmd_ready
         IMPORT  g_bt_motion_mode_request
@@ -68,10 +72,17 @@ main_prev_state         SPACE   4
 
         IMPORT  BREATHE_Init
         IMPORT  BREATHE_Update
+        
+        IMPORT  VEIN_Init
+        IMPORT  VEIN_Update
+        IMPORT  Stress_Update
 
         IMPORT  BT_Init
         IMPORT  BT_RxTask
         IMPORT  BT_PeriodicTask
+
+        IMPORT  StationIR_Init
+        IMPORT  StationIR_Update
 
 __main
 Main_Entry
@@ -82,14 +93,35 @@ Main_Entry
 
 Main_Loop
         BL      BT_RxTask
+        BL      Main_ProcessBluetoothCmd
         BL      Main_CheckIRInput
         BL      Smoke_Check
         BL      Main_BackgroundTasks
         BL      Main_DispatchByState
+        
+        LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        CMP     R1, #STATE_MED_DISPENSE
+        BEQ     Main_ForceUI
+
+        LDR     R0, =g_ms_ticks
+        LDR     R1, [R0]
+        LDR     R0, =ui_last_draw_tick
+        LDR     R2, [R0]
+        SUBS    R3, R1, R2
+        CMP     R3, #100
+        BLO     Main_SkipUI
+        
+Main_ForceUI
+        LDR     R0, =g_ms_ticks
+        LDR     R1, [R0]
+        LDR     R0, =ui_last_draw_tick
+        STR     R1, [R0]
         BL      UI_Update
         BL      BT_PeriodicTask
-        BL      Main_HandleStateTransitions
 
+Main_SkipUI
+        BL      Main_HandleStateTransitions
         B       Main_Loop
 
 
@@ -146,6 +178,9 @@ MCI_StoreNow
         CMP     R6, #STATE_MAIN_MENU
         BEQ     MCI_State_MainMenu
 
+        CMP     R6, #STATE_MORE_MENU
+        BEQ     MCI_State_MoreMenu
+
         CMP     R6, #STATE_MED_INPUT
         BEQ     MCI_State_MedInput
 
@@ -166,25 +201,33 @@ MCI_StoreNow
 
 
 MCI_State_MainMenu
-        CMP     R5, #69
+        CMP     R5, #25          ; 0 = open More Menu
+        BEQ     MCI_Key0
+        CMP     R5, #69          ; 1
         BEQ     MCI_Key1
-
-        CMP     R5, #70
+        CMP     R5, #70          ; 2
         BEQ     MCI_Key2
-
-        CMP     R5, #71
+        CMP     R5, #71          ; 3
         BEQ     MCI_Key3
-
-        CMP     R5, #68
+        CMP     R5, #68          ; 4
         BEQ     MCI_Key4
-
-        CMP     R5, #64
+        CMP     R5, #64          ; 5
         BEQ     MCI_Key5
-
-        CMP     R5, #67
+        CMP     R5, #67          ; 6 = Vision
         BEQ     MCI_Key6
-
         B.W     MCI_Exit
+
+
+MCI_State_MoreMenu
+        CMP     R5, #67          ; 6 = Vision
+        BEQ     MCI_Key6
+        CMP     R5, #7           ; 7 = Vein
+        BEQ     MCI_Key7
+        CMP     R5, #21          ; 8 = Stress
+        BEQ     MCI_Key8
+        CMP     R5, #13          ; # = back to main menu
+        BEQ     MCI_KeyC
+        B       MCI_Exit
 
 
 MCI_State_MedInput
@@ -396,16 +439,20 @@ Main_InitCore
         BL      SysTick_Init
         BL      TFT_Init
         BL      ADC_Init
+        BL      ADC_AWD_Init
         BL      PWM_Init
         BL      SAN_Init
         BL      BREATHE_Init
         BL      HR_Init
         BL      IR_Init
+        BL      VEIN_Init
         BL      MOT_Init
         BL      MotionBT_Init
         BL      MED_Init
         BL      Buzzer_Init
         BL      BT_Init
+        BL      HCSR04_Init
+        BL      StationIR_Init
 
         POP     {PC}
 
@@ -456,6 +503,9 @@ Main_InitGlobals
         LDR     R0, =temp_last_read_tick
         STR     R1, [R0]
 
+        LDR     R0, =ui_last_draw_tick
+        STR     R1, [R0]
+
         POP     {PC}
 
 
@@ -470,11 +520,12 @@ Main_SetInitialState
 
         BX      LR
 
-
+ 
 Main_BackgroundTasks
-        PUSH    {LR}
+         PUSH    {LR}
         BL      MED_BackgroundTask
         BL      Main_ProcessBluetoothCmd
+        BL      StationIR_Update
         BL      MOT_Update
         BL      Buzzer_Update
         POP     {PC}
@@ -569,6 +620,12 @@ Main_DispatchByState
         CMP     R4, #STATE_PPG_WAVE
         BEQ     CallPPG
 
+        CMP     R4, #STATE_VEIN_FINDER
+        BEQ     CallVein
+
+        CMP     R4, #STATE_STRESS
+        BEQ     CallStress
+
         B       DispatchEnd
 
 CallMedWaiting
@@ -614,6 +671,15 @@ CallPPG
         BL      HR_ReadFIFO
         B       DispatchEnd
 
+CallVein
+        BL      VEIN_Update
+        B       DispatchEnd
+
+CallStress
+        BL      HR_ReadFIFO
+        BL      Stress_Update
+        B       DispatchEnd
+
 DispatchEnd
         POP     {R4, PC}
 
@@ -629,7 +695,7 @@ Main_HandleStateTransitions
 
         CMP     R5, #STATE_SANITIZING
         BNE     MHT_NoLeaveSan
-
+        
         CMP     R4, #STATE_SANITIZING
         BEQ     MHT_NoLeaveSan
 

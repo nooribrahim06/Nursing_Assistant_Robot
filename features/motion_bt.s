@@ -15,6 +15,7 @@ phone_dir       DCD     0
         ALIGN
 
         GET     constants.s
+        GET     motion_constants.s
 
         EXPORT  MotionBT_Init
         EXPORT  MotionBT_SetMode
@@ -35,6 +36,8 @@ phone_dir       DCD     0
         IMPORT  Motion_Right
         IMPORT  Motion_Stop
         IMPORT  PWM_Set_Motor_Speed
+
+        IMPORT  MOT_StopNow
 
 ; ---------------------------------------------------------------------
 ; MotionBT_Init
@@ -160,7 +163,7 @@ MBT_CheckDir
         BEQ     MBT_Action_Right
 
         ; STOP or invalid
-        BL      Motion_Stop
+        BL      MOT_StopNow
         B       MBT_Exit
 
 MBT_Action_Forward
@@ -178,14 +181,14 @@ MBT_Action_Back
         B       MBT_Exit
 
 MBT_Action_Left
-        BL      Motion_Forward
+        BL      Motion_Left
         LDR     R0, =PHONE_TURN_FAST
         LDR     R1, =PHONE_TURN_SLOW
         BL      PWM_Set_Motor_Speed
         B       MBT_Exit
 
 MBT_Action_Right
-        BL      Motion_Forward
+        BL      Motion_Right
         LDR     R0, =PHONE_TURN_SLOW
         LDR     R1, =PHONE_TURN_FAST
         BL      PWM_Set_Motor_Speed
@@ -195,4 +198,4 @@ MBT_Exit
         POP     {R3-R5, PC}
 
         ALIGN
-        END
+        END 

@@ -8,6 +8,7 @@
 ;   - HR_ReadTemp exists and has watchdog
 ;   - exports g_temp_int / g_temp_frac
 ;   - HR_ReadFIFO updates real g_hr_ir_raw for PPG wave
+;   - ADDED: High-Pass Filter (DC Removal) for stable TFT Graph
 ; =====================================================================
 
         INCLUDE constants.s
@@ -17,10 +18,13 @@
 
         EXPORT  g_temp_int
         EXPORT  g_temp_frac
+        EXPORT  g_hr_ac_val      ; ??????? ?????? ????? ?????? ???????
 
 fifo_buf        SPACE   6
 g_temp_int      SPACE   4
 g_temp_frac     SPACE   4
+g_dc_estimator  SPACE   4        ; ???? ?????? ??????? (DC Offset)
+g_hr_ac_val     SPACE   4        ; ?????? ??????? ????? ???????
 
         AREA    HR_CODE, CODE, READONLY
         THUMB
@@ -178,14 +182,17 @@ HRI_ResetDone
 
         LDR     R0, =g_temp_frac
         STR     R1, [R0]
+        
+        ; clear filter globals
+        LDR     R0, =g_dc_estimator
+        STR     R1, [R0]
+        LDR     R0, =g_hr_ac_val
+        STR     R1, [R0]
 
         POP     {R4-R7, PC}
 
 ; =====================================================================
 ; HR_ReadTemp
-; Reads MAX30102 die temperature.
-; This is NOT body temperature.
-; g_temp_frac is in 1/16 C units.
 ; =====================================================================
 HR_ReadTemp
         PUSH    {R4-R6, LR}
@@ -301,6 +308,35 @@ HR_ReadFIFO
         LDR     R0, =g_hr_ir_raw
         STR     R6, [R0]
 
+        ; -------------------------------------------------------------
+        ; HIGH-PASS FILTER (DC Removal for Graph)
+        ; -------------------------------------------------------------
+        LDR     R0, =g_dc_estimator
+        LDR     R1, [R0]            ; Load current DC
+
+        CMP     R1, #0              ; If DC is 0, initialize it
+        BNE     Filter_Calc
+        MOV     R1, R6              ; Set initial DC to first raw value
+        STR     R1, [R0]
+
+Filter_Calc
+        SUBS    R2, R6, R1          ; R2 = Sample - DC
+        ASRS    R3, R2, #4          ; R3 = (Sample - DC) / 16
+        ADDS    R1, R1, R3          ; DC = DC + R3
+        STR     R1, [R0]            ; Save new DC
+
+        ; AC value = Sample - New DC
+        SUBS    R2, R6, R1          ; R2 = AC value (around 0)
+        
+        ; Add offset to AC to keep it positive for TFT graphing (e.g. +2000)
+        ; ????? ????? ?? ????? ??? ????? ????? ??? ???? ?????? ?? ?????
+        LDR     R3, =2000
+        ADDS    R2, R2, R3
+
+        LDR     R0, =g_hr_ac_val
+        STR     R2, [R0]
+        ; -------------------------------------------------------------
+
         ; finger detection
         MOVW    R0, #40000
         CMP     R6, R0
@@ -351,6 +387,12 @@ HRF_No_Finger
         LDR     R0, =g_spo2
         STR     R1, [R0]
         LDR     R0, =g_bpm
+        STR     R1, [R0]
+        
+        ; ????? ?????? ??? ??? ?????? ????? ?? ???? ??? ?????
+        LDR     R0, =g_dc_estimator
+        STR     R1, [R0]
+        LDR     R0, =g_hr_ac_val
         STR     R1, [R0]
 
 HRF_Exit

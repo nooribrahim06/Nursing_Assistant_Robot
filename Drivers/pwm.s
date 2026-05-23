@@ -39,26 +39,24 @@ PWM_Init
         ORR     R1, R1, #0x06
         STR     R1, [R0, #RCC_APB1ENR]
 
-        ; PA6 / PA7 -> AF2 (TIM3 CH1 / CH2)
+        ; PA6 only -> AF2 (TIM3 CH1, Medicine servo)
+        ; PA7 is reserved for Vein sensor ADC - do NOT touch it here
         LDR     R0, =GPIOA_BASE
 
         LDR     R1, [R0, #GPIO_MODER]
-        LDR     R2, =0x0000F000
-        BIC     R1, R1, R2
-        LDR     R2, =0x0000A000
-        ORR     R1, R1, R2
+        BIC     R1, R1, #0x00003000  ; Clear bits 12-13 (PA6 only)
+        ORR     R1, R1, #0x00002000  ; AF mode for PA6 only
         STR     R1, [R0, #GPIO_MODER]
 
         LDR     R1, [R0, #GPIO_AFRL]
-        LDR     R2, =0xFF000000
+        LDR     R2, =0x0F000000      ; AFRL bits 24-27 (PA6 only)
         BIC     R1, R1, R2
-        LDR     R2, =0x22000000
+        LDR     R2, =0x02000000      ; AF2 for PA6 only
         ORR     R1, R1, R2
         STR     R1, [R0, #GPIO_AFRL]
 
         LDR     R1, [R0, #GPIO_PUPDR]
-        LDR     R2, =0x0000F000
-        BIC     R1, R1, R2
+        BIC     R1, R1, #0x00003000  ; Clear pull for PA6 only
         STR     R1, [R0, #GPIO_PUPDR]
 
         ; PB6 / PB7 -> AF2 (TIM4 CH1 / CH2)
@@ -92,16 +90,14 @@ PWM_Init
         LDR     R0, =19999
         STR     R0, [R4, #TIM_ARR]
 
-        LDR     R0, =0x6868
+        LDR     R0, =0x6868          ; PWM mode for both CH1 and CH2
         STR     R0, [R4, #TIM_CCMR1]
 
-        LDR     R0, =0x0011
+        LDR     R0, =0x0011          ; Enable both CH1 and CH2
         STR     R0, [R4, #TIM_CCER]
 
         LDR     R0, =1000
         STR     R0, [R4, #TIM_CCR1]
-        LDR     R0, =1500
-        STR     R0, [R4, #TIM_CCR2]
 
         MOVS    R0, #1
         STR     R0, [R4, #TIM_EGR]

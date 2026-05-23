@@ -17,12 +17,14 @@
 ;=============================================================================
 
         GET     constants.s
+        ;GET     bluetooth_constants.s
 
         AREA    BT_RODATA, DATA, READONLY
         ALIGN
 
 BT_TEXT_CMD_MODE_PHONE  DCB "PHONE",0
 BT_TEXT_CMD_MODE_LINE   DCB "LINE",0
+BT_TEXT_ACK_PREFIX      DCB "ACK=",0
 BT_TEXT_CMD_DIR_FWD     DCB "FWD",0
 BT_TEXT_CMD_DIR_BACK    DCB "BACK",0
 BT_TEXT_CMD_DIR_LEFT    DCB "LEFT",0
@@ -76,6 +78,7 @@ BT_TX_CRLF              DCB 13,10,0
         EXPORT  BT_SendDebugNow
         EXPORT  BT_SendMedDispensed
         EXPORT  BT_TxTask
+        EXPORT  BT_QueueACK
 
 ;-----------------------------------------------------------------------------
 ; Shared project globals
@@ -234,6 +237,7 @@ BT_Update
 BT_RxTask
         PUSH    {R4-R7, LR}
 
+BTRX_PollLoop
         LDR     R4, =BT_USART2_BASE
         LDR     R5, [R4, #BT_USART_SR]
         TST     R5, #BT_USART_SR_RXNE
@@ -251,7 +255,7 @@ BT_RxTask
 
         ; Ignore CR
         CMP     R6, #BT_ASCII_CR
-        BEQ     BTRX_Exit
+        BEQ     BTRX_PollLoop
 
         ; LF ends the command line
         CMP     R6, #BT_ASCII_LF
@@ -267,7 +271,7 @@ BT_RxTask
         STRB    R6, [R7, R5]
         ADDS    R5, R5, #1
         STR     R5, [R4]
-        B       BTRX_Exit
+        B       BTRX_PollLoop
 
 BTRX_LineDone
         LDR     R4, =bt_rx_index
@@ -282,7 +286,7 @@ BTRX_LineDone
 
 BTRX_ClearOnly
         BL      BT_ClearBuffer
-        B       BTRX_Exit
+        B       BTRX_PollLoop
 
 BTRX_Overflow
         ; Corrupted/too-long line: drop it safely.
@@ -444,39 +448,46 @@ BT_ParseLine
         ; Unknown OFF command
         B       BTP_Exit
 
-BTP_ModePhone
-        MOVS    R0, #BT_MODE_PHONE
-        BL      BT_SetModeRequest
-        B       BTP_Exit
-
-BTP_ModeLine
-        MOVS    R0, #BT_MODE_LINE
-        BL      BT_SetModeRequest
-        B       BTP_Exit
-
 BTP_DirFwd
         MOVS    R0, #BT_DIR_FWD
         BL      BT_SetDirRequest
+        BL      BT_QueueACK
         B       BTP_Exit
 
 BTP_DirBack
         MOVS    R0, #BT_DIR_BACK
         BL      BT_SetDirRequest
+        BL      BT_QueueACK
         B       BTP_Exit
 
 BTP_DirLeft
         MOVS    R0, #BT_DIR_LEFT
         BL      BT_SetDirRequest
+        BL      BT_QueueACK
         B       BTP_Exit
 
 BTP_DirRight
         MOVS    R0, #BT_DIR_RIGHT
         BL      BT_SetDirRequest
+        BL      BT_QueueACK
         B       BTP_Exit
 
 BTP_DirStop
         MOVS    R0, #BT_DIR_STOP
         BL      BT_SetDirRequest
+        BL      BT_QueueACK
+        B       BTP_Exit
+
+BTP_ModePhone
+        MOVS    R0, #BT_MODE_PHONE
+        BL      BT_SetModeRequest
+        BL      BT_QueueACK
+        B       BTP_Exit
+
+BTP_ModeLine
+        MOVS    R0, #BT_MODE_LINE
+        BL      BT_SetModeRequest
+        BL      BT_QueueACK
         B       BTP_Exit
 
 BTP_MedOff
@@ -797,39 +808,43 @@ BTAS_Exit
 ; Uses UDIV, valid on Cortex-M4 STM32F401.
 ;=============================================================================
 BT_AppendU32
-        PUSH    {R4-R7, LR}
+        PUSH    {R4-R6, LR}
+        LDR     R4, =bt_num_buffer
+        MOVS    R5, #0          ; char count
 
-        MOV     R4, R0
-        CMP     R4, #0
-        BNE     BTAU_NonZero
+        ; If R0 == 0, special case
+        CMP     R0, #0
+        BNE     BTAU_NotZero
+        MOVS    R1, #BT_ASCII_0
+        STRB    R1, [R4]
+        MOVS    R5, #1
+        B       BTAU_DoneBuilding
 
-        MOVS    R0, #BT_ASCII_0
+BTAU_NotZero
+        MOVS    R1, #10
+BTAU_BuildLoop
+        CMP     R0, #0
+        BEQ     BTAU_DoneBuilding
+        UDIV    R2, R0, R1      ; R2 = R0 / 10
+        MLS     R3, R2, R1, R0  ; R3 = R0 - (R2 * 10) = remainder
+        ADDS    R3, R3, #BT_ASCII_0
+        STRB    R3, [R4, R5]
+        ADDS    R5, R5, #1
+        MOV     R0, R2
+        B       BTAU_BuildLoop
+
+BTAU_DoneBuilding
+        ; Buffer now has digits in REVERSE order. Append them to TX buffer in correct order.
+BTAU_CopyLoop
+        CMP     R5, #0
+        BEQ     BTAU_Exit
+        SUBS    R5, R5, #1
+        LDRB    R0, [R4, R5]
         BL      BT_AppendChar
-        POP     {R4-R7, PC}
+        B       BTAU_CopyLoop
 
-BTAU_NonZero
-        LDR     R5, =bt_num_buffer
-        MOVS    R6, #0          ; digit count
-        MOVS    R7, #10
-
-BTAU_DivLoop
-        UDIV    R1, R4, R7      ; q = value / 10
-        MLS     R2, R1, R7, R4  ; r = value - q*10
-        ADDS    R2, R2, #BT_ASCII_0
-        STRB    R2, [R5, R6]
-        ADDS    R6, R6, #1
-        MOV     R4, R1
-        CMP     R4, #0
-        BNE     BTAU_DivLoop
-
-BTAU_OutLoop
-        SUBS    R6, R6, #1
-        LDRB    R0, [R5, R6]
-        BL      BT_AppendChar
-        CMP     R6, #0
-        BNE     BTAU_OutLoop
-
-        POP     {R4-R7, PC}
+BTAU_Exit
+        POP     {R4-R6, PC}
 
         ALIGN
         LTORG
@@ -838,149 +853,175 @@ BTAU_OutLoop
 ; BT_QueueVitals
 ;=============================================================================
 BT_QueueVitals
-        PUSH    {R4-R7, LR}
-
-        BL      BT_TxIdle
-        CMP     R0, #1
-        BNE     BTQV_Exit
-
+        PUSH    {LR}
         BL      BT_StartPacket
-
         LDR     R0, =BT_TX_VITALS_1
         BL      BT_AppendString
         LDR     R0, =g_bpm
         LDR     R0, [R0]
         BL      BT_AppendU32
-
         LDR     R0, =BT_TX_SPO2
         BL      BT_AppendString
         LDR     R0, =g_spo2
         LDR     R0, [R0]
         BL      BT_AppendU32
-
         LDR     R0, =BT_TX_BREATH
         BL      BT_AppendString
         LDR     R0, =g_breath_level
         LDR     R0, [R0]
         BL      BT_AppendU32
-
         LDR     R0, =BT_TX_SMOKE
         BL      BT_AppendString
         LDR     R0, =g_smoke_level
         LDR     R0, [R0]
         BL      BT_AppendU32
-
         LDR     R0, =BT_TX_MED
         BL      BT_AppendString
         LDR     R0, =g_med_timer
         LDR     R0, [R0]
         BL      BT_AppendU32
-
+        
+        ; Add alerts field
         LDR     R0, =BT_TX_ALERT_FIELD
         BL      BT_AppendString
-
-        LDR     R0, =g_alarm_flags
-        LDR     R4, [R0]
-        ANDS    R5, R4, #Smoke_Alert_Flag
-        ANDS    R6, R4, #Med_Alert_Flag
-
-        CMP     R5, #0
-        BEQ     BTQV_NoSmoke
-        CMP     R6, #0
-        BEQ     BTQV_OnlySmoke
-        LDR     R0, =BT_TX_BOTH_ALERTS
-        B       BTQV_AppendAlert
-
-BTQV_OnlySmoke
-        LDR     R0, =BT_TX_SMOKE_DETECTED
-        B       BTQV_AppendAlert
-
-BTQV_NoSmoke
-        CMP     R6, #0
-        BEQ     BTQV_NoAlert
-        LDR     R0, =BT_TX_MED_ALERT
-        B       BTQV_AppendAlert
-
-BTQV_NoAlert
+        
+        LDR     R1, =g_alarm_flags
+        LDR     R1, [R1]
+        
+        ; Both
+        LDR     R2, =(Smoke_Alert_Flag :OR: Med_Alert_Flag)
+        ANDS    R2, R2, R1
+        LDR     R3, =(Smoke_Alert_Flag :OR: Med_Alert_Flag)
+        CMP     R2, R3
+        BEQ     BTQV_Both
+        
+        ; Smoke only
+        LDR     R2, =Smoke_Alert_Flag
+        ANDS    R2, R2, R1
+        CMP     R2, #Smoke_Alert_Flag
+        BEQ     BTQV_Smoke
+        
+        ; Med only
+        LDR     R2, =Med_Alert_Flag
+        ANDS    R2, R2, R1
+        CMP     R2, #Med_Alert_Flag
+        BEQ     BTQV_Med
+        
+        ; None
         LDR     R0, =BT_TX_NONE
-
-BTQV_AppendAlert
         BL      BT_AppendString
+        B       BTQV_Final
+        
+BTQV_Both
+        LDR     R0, =BT_TX_BOTH_ALERTS
+        BL      BT_AppendString
+        B       BTQV_Final
+        
+BTQV_Smoke
+        LDR     R0, =BT_TX_SMOKE_DETECTED
+        BL      BT_AppendString
+        B       BTQV_Final
+        
+BTQV_Med
+        LDR     R0, =BT_TX_MED_ALERT
+        BL      BT_AppendString
+
+BTQV_Final
         LDR     R0, =BT_TX_CRLF
         BL      BT_AppendString
-
-BTQV_Exit
-        POP     {R4-R7, PC}
+        POP     {PC}
 
         ALIGN
         LTORG
 
 ;=============================================================================
-; BT_SendVitalsNow
-; Optional manual export.
+; BT_CheckMedEvent
 ;=============================================================================
-BT_SendVitalsNow
-        B       BT_QueueVitals
+BT_CheckMedEvent
+        PUSH    {R4, R5, LR}
+        LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        LDR     R0, =bt_last_med_state
+        LDR     R2, [R0]
+        
+        CMP     R1, R2
+        BEQ     BTCME_Exit
+        
+        ; State changed. Was it from Dispense to Wait?
+        CMP     R2, #STATE_MED_DISPENSE
+        BNE     BTCME_Update
+        CMP     R1, #STATE_MED_WAITING
+        BEQ     BTCME_Queue
+        CMP     R1, #STATE_MAIN_MENU
+        BEQ     BTCME_Queue
+        B       BTCME_Update
+
+BTCME_Queue
+        BL      BT_SendMedDispensed
+
+BTCME_Update
+        LDR     R0, =bt_last_med_state
+        STR     R1, [R0]
+
+BTCME_Exit
+        POP     {R4, R5, PC}
+
+        ALIGN
+        LTORG
+
+;=============================================================================
+; BT_SendMedDispensed
+;=============================================================================
+BT_SendMedDispensed
+        PUSH    {LR}
+        BL      BT_StartPacket
+        LDR     R0, =BT_TX_MED_EVENT
+        BL      BT_AppendString
+        POP     {PC}
 
         ALIGN
         LTORG
 
 ;=============================================================================
 ; BT_CheckSmokeAlert
-; Queues ALERT packet on rising smoke alert, then every 2 seconds while active.
 ;=============================================================================
 BT_CheckSmokeAlert
-        PUSH    {R4-R7, LR}
-
+        PUSH    {R4-R6, LR}
         LDR     R0, =g_alarm_flags
-        LDR     R4, [R0]
-        ANDS    R4, R4, #Smoke_Alert_Flag
-        CMP     R4, #0
-        BNE     BTCSA_SmokeActive
-
-        MOVS    R1, #0
-        LDR     R0, =bt_alert_active
-        STR     R1, [R0]
+        LDR     R1, [R0]
+        LDR     R2, =Smoke_Alert_Flag
+        TST     R1, R2
+        BEQ     BTCSA_Clear
+        
+        ; Alarm is set. Have we reported it recently?
+        LDR     R3, =g_ms_ticks
+        LDR     R4, [R3]
+        LDR     R3, =bt_last_alert_tick
+        LDR     R5, [R3]
+        SUBS    R6, R4, R5
+        LDR     R0, =5000       ; 5 seconds re-alert
+        CMP     R6, R0
+        BLO     BTCSA_Exit
+        
+        STR     R4, [R3]
+        BL      BT_SendSmokeAlert
         B       BTCSA_Exit
 
-BTCSA_SmokeActive
-        BL      BT_TxIdle
-        CMP     R0, #1
-        BNE     BTCSA_Exit
-
-        LDR     R0, =g_ms_ticks
-        LDR     R5, [R0]
-
-        LDR     R0, =bt_alert_active
-        LDR     R6, [R0]
-        CMP     R6, #0
-        BEQ     BTCSA_Queue
-
-        LDR     R0, =bt_last_alert_tick
-        LDR     R6, [R0]
-        SUBS    R7, R5, R6
-        LDR     R6, =BT_REPORT_PERIOD_MS
-        CMP     R7, R6
-        BLO     BTCSA_Exit
-
-BTCSA_Queue
-        LDR     R0, =bt_last_alert_tick
-        STR     R5, [R0]
-        MOVS    R1, #1
-        LDR     R0, =bt_alert_active
-        STR     R1, [R0]
-        BL      BT_QueueSmokeAlert
+BTCSA_Clear
+        LDR     R3, =bt_last_alert_tick
+        MOVS    R4, #0
+        STR     R4, [R3]
 
 BTCSA_Exit
-        POP     {R4-R7, PC}
+        POP     {R4-R6, PC}
 
         ALIGN
         LTORG
 
 ;=============================================================================
-; BT_QueueSmokeAlert
+; BT_SendSmokeAlert
 ;=============================================================================
-BT_QueueSmokeAlert
+BT_SendSmokeAlert
         PUSH    {LR}
         BL      BT_StartPacket
         LDR     R0, =BT_TX_ALERT_1
@@ -996,118 +1037,61 @@ BT_QueueSmokeAlert
         LTORG
 
 ;=============================================================================
-; BT_CheckMedEvent
-; Queues MED_EVENT once when state enters STATE_MED_DISPENSE.
+; BT_SendVitalsNow
+; (DEBUG / Force send)
 ;=============================================================================
-BT_CheckMedEvent
-        PUSH    {R4-R6, LR}
-
-        LDR     R0, =g_sys_state
-        LDR     R4, [R0]
-
-        LDR     R0, =bt_last_med_state
-        LDR     R5, [R0]
-        STR     R4, [R0]
-
-        CMP     R4, #STATE_MED_DISPENSE
-        BNE     BTCME_Exit
-        CMP     R5, #STATE_MED_DISPENSE
-        BEQ     BTCME_Exit
-
-        BL      BT_TxIdle
-        CMP     R0, #1
-        BNE     BTCME_Exit
-
-        BL      BT_QueueMedEvent
-
-BTCME_Exit
-        POP     {R4-R6, PC}
-
-        ALIGN
-        LTORG
-
-;=============================================================================
-; BT_QueueMedEvent / BT_SendMedDispensed
-;=============================================================================
-BT_QueueMedEvent
+BT_SendVitalsNow
         PUSH    {LR}
-        BL      BT_StartPacket
-        LDR     R0, =BT_TX_MED_EVENT
-        BL      BT_AppendString
+        BL      BT_QueueVitals
+        BL      BT_TxTask
         POP     {PC}
-
-        ALIGN
-        LTORG
-
-BT_SendMedDispensed
-        B       BT_QueueMedEvent
-
-        ALIGN
-        LTORG
 
 ;=============================================================================
 ; BT_SendDebugNow
-; Queues one DEBUG packet if TX is idle.
+; (DEBUG / Force send)
 ;=============================================================================
 BT_SendDebugNow
-        PUSH    {R4-R7, LR}
-
-        BL      BT_TxIdle
-        CMP     R0, #1
-        BNE     BTSD_Exit
-
+        PUSH    {LR}
         BL      BT_StartPacket
-
         LDR     R0, =BT_TX_DEBUG_1
         BL      BT_AppendString
+        
         LDR     R0, =g_smoke_level
         LDR     R0, [R0]
         BL      BT_AppendU32
-
+        
         LDR     R0, =BT_TX_DEBUG_BREATH
         BL      BT_AppendString
         LDR     R0, =g_breath_level
         LDR     R0, [R0]
         BL      BT_AppendU32
-
+        
         LDR     R0, =BT_TX_DEBUG_STATE
         BL      BT_AppendString
         LDR     R0, =g_sys_state
         LDR     R0, [R0]
         BL      BT_AppendU32
 
-        ; Line left
-        LDR     R0, =BT_TX_DEBUG_LINE_L
-        BL      BT_AppendString
-        LDR     R0, =GPIOB_BASE
-        MOVS    R1, #LINE_LEFT
-        BL      GPIO_ReadPin
-        BL      BT_AppendU32
-
-        ; Line center
-        LDR     R0, =BT_TX_DEBUG_LINE_C
-        BL      BT_AppendString
-        LDR     R0, =GPIOB_BASE
-        MOVS    R1, #LINE_CENTER
-        BL      GPIO_ReadPin
-        BL      BT_AppendU32
-
-        ; Line right
-        LDR     R0, =BT_TX_DEBUG_LINE_R
-        BL      BT_AppendString
-        LDR     R0, =GPIOB_BASE
-        MOVS    R1, #LINE_RIGHT
-        BL      GPIO_ReadPin
-        BL      BT_AppendU32
-
         LDR     R0, =BT_TX_CRLF
         BL      BT_AppendString
+        BL      BT_TxTask
+        POP     {PC}
 
-BTSD_Exit
-        POP     {R4-R7, PC}
-
-        ALIGN
-        LTORG
+;=============================================================================
+; BT_QueueACK
+; Sends "ACK=" + current rx_buffer + \n
+;=============================================================================
+BT_QueueACK
+        PUSH    {LR}
+        BL      BT_StartPacket
+        LDR     R0, =BT_TEXT_ACK_PREFIX
+        BL      BT_AppendString
+        LDR     R0, =bt_rx_buffer
+        BL      BT_AppendString
+        LDR     R0, =BT_TX_CRLF
+        BL      BT_AppendString
+        BL      BT_TxTask               ; Send immediately
+        POP     {PC}
 
         ALIGN
         END

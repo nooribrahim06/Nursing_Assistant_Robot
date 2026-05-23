@@ -28,6 +28,7 @@ Last_Turn               DCD     0       ; 0=Straight, 1=Left, 2=Right
         ALIGN
 
         GET     constants.s
+        GET     motion_constants.s
         
 
 ; ---------------------------------------------------------------------
@@ -60,6 +61,13 @@ Last_Turn               DCD     0       ; 0=Straight, 1=Left, 2=Right
 
         IMPORT  g_motion_mode
         IMPORT  MotionBT_Task
+        IMPORT  HCSR04_Read
+
+        IMPORT  g_ms_ticks
+        IMPORT  g_last_ultra_tick
+        IMPORT  g_last_ultra_dist
+
+        IMPORT  g_station_detected
 
 ; ---------------------------------------------------------------------
 ; Local motion-control values
@@ -100,20 +108,19 @@ MOT_Init
         MOV     R1, #MOT_IN4
         BL      GPIO_ConfigOutput
 
-        ; Existing line sensor pins kept exactly as current file:
         ; LEFT   -> PB12
         ; CENTER -> PB15
         ; RIGHT  -> PB14
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #12
+        MOV     R1, #LINE_LEFT
         BL      GPIO_ConfigInput
 
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #15
+        MOV     R1, #LINE_CENTER
         BL      GPIO_ConfigInput
 
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #14
+        MOV     R1, #LINE_RIGHT
         BL      GPIO_ConfigInput
 
         ; Keep old behavior: PWM init here
@@ -140,14 +147,51 @@ MOT_Init
 ;   run original/default line tracker flow.
 ; =====================================================================
 MOT_Update
-        PUSH    {R3-R7, LR}             ; R3 pushed to ensure 8-byte stack alignment
+        PUSH    {R3-R7, LR}
 
+        ; 1. Unified Safety Check (Runs in both LINE and PHONE modes)
+        LDR     R0, =g_ms_ticks
+        LDR     R1, [R0]
+        LDR     R0, =g_last_ultra_tick
+        LDR     R2, [R0]
+        SUBS    R3, R1, R2
+        CMP     R3, #50             ; 20Hz update
+        BLO     MOT_CheckMode       ; Skip read if not time yet, but still check mode
+        
+        STR     R1, [R0]
+        BL      HCSR04_Read
+        LDR     R1, =g_last_ultra_dist
+        STR     R0, [R1]
+
+MOT_CheckMode
+        ; 2. Obstacle Safety Stop
+        LDR     R0, =g_last_ultra_dist
+        LDR     R0, [R0]
+        CMP     R0, #15
+        BHS     MOT_CheckStation
+        BL      MOT_StopNow         ; CRITICAL: Stop in ANY mode if obstacle detected
+        B       MOT_Update_Exit
+
+        ; ---- IR STATION CHECK ----
+MOT_CheckStation
+        LDR     R0, =g_station_detected
+        LDR     R0, [R0]
+        CMP     R0, #0
+        BEQ     MOT_ModeDispatch
+        BL      MOT_StopNow         ; Station detected -> full stop
+        B       MOT_Update_Exit
+
+MOT_ModeDispatch
+        ; 3. Mode Selection
         LDR     R0, =g_motion_mode
         LDR     R1, [R0]
-
         CMP     R1, #MOTION_MODE_PHONE
-        BNE     MOT_DefaultFlow
+        BEQ     MOT_RunPhoneTask
 
+        ; 4. Default: Line Tracking
+        B       MOT_DefaultFlow
+
+MOT_RunPhoneTask
         BL      MotionBT_Task
         B       MOT_Update_Exit
 
@@ -157,27 +201,28 @@ MOT_Update
 ; This is the old/current line-tracker logic kept as-is.
 ; =====================================================================
 MOT_DefaultFlow
-        ; 1. LEFT SENSOR PB12 -> Bit 2
+        ; 1. LEFT SENSOR
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #12
+        MOV     R1, #LINE_LEFT
         BL      GPIO_ReadPin
         LSL     R4, R0, #2
 
-        ; 2. CENTER SENSOR PB15 -> Bit 1
+        ; 2. CENTER SENSOR
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #15
+        MOV     R1, #LINE_CENTER
         BL      GPIO_ReadPin
         LSL     R5, R0, #1
 
-        ; 3. RIGHT SENSOR PB14 -> Bit 0
+        ; 3. RIGHT SENSOR
         LDR     R0, =GPIOB_BASE
-        MOV     R1, #14
+        MOV     R1, #LINE_RIGHT
         BL      GPIO_ReadPin
         MOV     R6, R0
 
         ; 4. Combine sensor mask
         ORR     R7, R4, R5
         ORR     R7, R7, R6
+        EOR     R7, R7, #7              ; Invert 3-bit mask (0 becomes 1, 1 becomes 0)
 
         ; -------------------------------------------------------------
         ; Existing decision tree
@@ -200,11 +245,11 @@ MOT_DefaultFlow
         CMP     R7, #0x03               ; Right + Center
         BEQ     Action_Arc_Right
 
-        CMP     R7, #0x07               ; All sensors
-        BEQ     Rescue_Lost_Line
-
-        CMP     R7, #0x00               ; No sensors
+        CMP     R7, #0x07               ; 3 Ones (Black Bar)
         BEQ     Action_Search
+
+        CMP     R7, #0x00               ; 3 Zeros (Lost Line)
+        BEQ     Rescue_Lost_Line
 
         B       Action_Search
 
@@ -217,10 +262,10 @@ Rescue_Lost_Line
         LDR     R3, [R2]
 
         CMP     R3, #1
-        BEQ     Action_Pivot_Right
+        BEQ     Action_Pivot_Left
 
         CMP     R3, #2
-        BEQ     Action_Pivot_Left
+        BEQ     Action_Pivot_Right
 
         B       Action_Straight
 

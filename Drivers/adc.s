@@ -66,12 +66,13 @@ ADC_Init
         BIC     R1, R1, #BIT11
         STR     R1, [R0, #ADC_CR2]
 
-        ; ---- 6. SMPR2: 84 cycles for channel 0 and 1 ----
-        ; ch0 bits [2:0] = 101
-        ; ch1 bits [5:3] = 101
+        ; ---- 6. SMPR2: 84 cycles for ch 0,1; 480 cycles for ch 7 ----
+        ; ch0 [2:0]=101, ch1 [5:3]=101, ch7 [23:21]=111
         LDR     R1, [R0, #ADC_SMPR2]
-        BIC     R1, R1, #0x0000003F
-        ORR     R1, R1, #0x0000002D
+        BIC     R1, R1, #0x0000003F  ; Clear ch0, ch1 bits
+        BIC     R1, R1, #0x00E00000  ; Clear ch7 bits
+        ORR     R1, R1, #0x0000002D  ; Set ch0=101, ch1=101
+        ORR     R1, R1, #0x00E00000  ; Set ch7=111 (480 cycles)
         STR     R1, [R0, #ADC_SMPR2]
 
         ; ---- 7. SQR1: sequence length = 1 ----
@@ -152,6 +153,41 @@ ADC_Read_Result
         AND     R0, R0, R2
 
         POP     {R1, R2, R3, PC}
+
+;=============================================================================
+; ADC_AWD_Init
+; Configure Analog Watchdog on channel 1 (MQ2 smoke sensor)
+; Fires ADC_IRQHandler when ADC result > 3000
+;=============================================================================
+        EXPORT  ADC_AWD_Init
+
+ADC_AWD_Init
+        PUSH    {R0-R2, LR}
+        LDR     R0, =ADC1_BASE
+
+        ; High threshold = 3000
+        LDR     R1, =3000
+        STR     R1, [R0, #ADC_HTR]
+
+        ; Low threshold = 0
+        MOVS    R1, #0
+        STR     R1, [R0, #ADC_LTR]
+
+        ; CR1: Watch single channel 1, enable AWD + AWD interrupt
+        LDR     R1, [R0, #ADC_CR1]
+        BIC     R1, R1, #0x1F
+        ORR     R1, R1, #1
+        ORR     R1, R1, #ADC_CR1_AWDSGL
+        ORR     R1, R1, #ADC_CR1_AWDEN
+        ORR     R1, R1, #ADC_CR1_AWDIE
+        STR     R1, [R0, #ADC_CR1]
+
+        ; Enable ADC1 IRQ (IRQ #18) in NVIC
+        LDR     R0, =NVIC_ISER0
+        LDR     R1, =(1 << 18)
+        STR     R1, [R0]
+
+        POP     {R0-R2, PC}
 
         ALIGN
         END

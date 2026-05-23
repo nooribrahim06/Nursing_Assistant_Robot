@@ -7,6 +7,7 @@
 ;=============================================================================
 
         GET     constants.s
+        ;GET     bluetooth_constants.s
 
         AREA    BT_BUFFERS, DATA, READWRITE
         ALIGN

@@ -69,6 +69,10 @@ Buzzer_Update
         CMP     R1, #STATE_MED_ALERT
         BEQ     BU_Active
 
+        ; Bypass standard buzzer logic if in Vein Finder mode
+        CMP     R1, #STATE_VEIN_FINDER
+        BEQ     BU_Exit
+
         ; Otherwise no buzzer
         B       BU_NoAlert
 

@@ -7,7 +7,7 @@
 
         AREA    SAN_CODE, CODE, READONLY
         THUMB
-        PRESERVE8
+        PRESERVE8 
         ALIGN
 
         GET     constants.s
