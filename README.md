@@ -28,6 +28,7 @@
   - [TFT Display Driver](#tft-display-driver)
 - [Feature Details](#feature-details)
   - [Heart Rate \& SpO₂](#️-heart-rate--spo₂-max30102)
+  - [Stress Monitor](#-stress-monitor)
   - [Breathing Monitor](#️-breathing-monitor)
   - [Temperature](#️-temperature)
   - [Medicine Dispenser](#-medicine-dispenser)
@@ -57,6 +58,7 @@ Special thanks to **[Teacher's Name]** for the ARM Assembly guide that made this
 |---------|-------------|------------|----------|
 | ❤️ Heart Rate Monitor | BPM via MAX30102 | ✅ | ✅ |
 | 🩸 SpO₂ Monitor | Blood oxygen via MAX30102 | ✅ | ✅ |
+| 😰 Stress Monitor | Calculates real-time stress level from BPM and system ticks | ✅ | ✅ |
 | 🌬️ Breathing Monitor | Real-time waveform via ADC | ✅ | ✅ |
 | 🌡️ Temperature | Internal temp from MAX30102 | ✅ | ✅ |
 | 💊 Medicine Dispenser | Timer + servo-controlled release | ✅ | ✅ |
@@ -354,7 +356,30 @@ ILI9341    ←  physical display
 > ✍️ *Add Proteus screenshot here if available.*
 
 ---
+### 😰 Stress Monitor
 
+**Files:** `stress.s`
+
+Calculates a dynamic stress score based on real-time heart rate and system ticks for a realistic UI representation.
+
+**How it works:**
+1. Reads the current heart rate (`g_bpm`) monitored by the MAX30102 sensor.
+2. Calculates the base score using the formula: `(BPM - 60) * 2`. (Negative results are clamped to 0).
+3. Adds a slight dynamic noise (0-3) extracted from the system timer (`g_ms_ticks`) to simulate real-time live fluctuations on the display.
+4. Clamps the maximum final score to 99% to ensure UI bounds are respected.
+5. Stores the final percentage in `g_stress_score` to be rendered by the state machine.
+
+**Key code:**
+```assembly
+; --- Base Stress Score Calculation ---
+; Formula: (BPM - 60) * 2
+SUBS    R2, R1, #60         ; Subtract 60 from current BPM
+BPL     Stress_Pos          ; If result is positive, branch to multiply
+MOVS    R2, #0              ; Clamp negative values to 0
+Stress_Pos
+LSLS    R2, R2, #1          ; Logical Shift Left by 1 (Fast multiply by 2)
+```
+ذذذذ
 ## 🌬️ Breathing Monitor
 
 **Files:** `breathing.s`, `adc.s`
