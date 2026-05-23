@@ -10,21 +10,15 @@
 
 **Microprocessors Final Project** — Cairo University, Faculty of Engineering, Computer Engineering Department
 
-| # | Name |
-|---|------|
-| 1 | Nour Ibrahim |
-| 2 | Youmna Mohamed |
-| 3 | Yehia Mahmoud |
-| 4 | Yasmine Ismail |
-| 5 | Yassin Abdelatty |
-| 6 | Mostafa El Shazly |
-| 7 | Moaz Amr |
-| 8 | Anton Azer |
-| 9 | Maryam Gamal |
-| 10 | Hashem Mohamed |
+| | |
+|:---:|:---:|
+| Nour Ibrahim | Youmna Mohamed |
+| Yehia Mahmoud | Yasmine Ismail |
+| Yassin Abdelatty | Mostafa El Shazly |
+| Moaz Amr | Anton Azer |
+| Maryam Gamal | Hashem Mohamed |
 
 ---
-
 ## 📋 Table of Contents
 
 - [About the Project](#-about-the-project)
