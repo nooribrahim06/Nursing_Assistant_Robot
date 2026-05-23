@@ -44,6 +44,9 @@ med_servo_pos_index     SPACE   4       ; 0=500us, 1=1500us, 2=2500us
         IMPORT  g_last_med_tick
         IMPORT  g_med_timer
         IMPORT  PWM_Set_Servo_Pos
+        IMPORT  g_pre_med_state
+        IMPORT  GPIO_WritePin
+        IMPORT  GPIO_ClearPin
 
         EXPORT  MED_Init
         EXPORT  MED_BackgroundTask
@@ -188,7 +191,14 @@ MBG_Finished
         ORR     R6, R6, #Med_Alert_Flag
         STR     R6, [R4]
 
+        ; Save current state before med alert
         LDR     R4, =g_sys_state
+        LDR     R6, [R4]
+        CMP     R6, #STATE_MED_ALERT
+        BEQ     MBG_SkipSave
+        LDR     R0, =g_pre_med_state
+        STR     R6, [R0]
+MBG_SkipSave
         MOVS    R6, #STATE_MED_ALERT
         STR     R6, [R4]
 
@@ -283,6 +293,11 @@ MSI_Confirm
         LDR     R6, =g_med_wait_ui
         STR     R7, [R6]
 
+        ; Set the return-to state so MED_WAITING goes back to main menu
+        LDR     R6, =g_pre_med_state
+        MOVS    R7, #STATE_MAIN_MENU
+        STR     R7, [R6]
+
         LDR     R6, =g_sys_state
         MOVS    R7, #STATE_MED_WAITING
         STR     R7, [R6]
@@ -309,8 +324,9 @@ Main_State_MedWaiting
         CMP     R5, R6
         BLO     MSW_Exit
 
+        LDR     R4, =g_pre_med_state
+        LDR     R5, [R4]
         LDR     R4, =g_sys_state
-        MOVS    R5, #STATE_MAIN_MENU
         STR     R5, [R4]
 
 MSW_Exit
@@ -362,6 +378,21 @@ MSD_Apply
         MOVS    R1, #0
         BL      PWM_Set_Servo_Pos
 
+        ; Beep to confirm dispense
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #BUZZER_PIN
+        BL      GPIO_WritePin
+        
+        ; Short delay for beep
+        LDR     R2, =200000
+MSD_BeepLoop
+        SUBS    R2, R2, #1
+        BNE     MSD_BeepLoop
+
+        LDR     R0, =GPIOB_BASE
+        MOVS    R1, #BUZZER_PIN
+        BL      GPIO_ClearPin
+
         ; Clear medicine alert
         LDR     R4, =g_alarm_flags
         LDR     R6, [R4]
@@ -383,9 +414,17 @@ MSD_Apply
         LDR     R4, =med_input_val
         STR     R5, [R4]
 
-        ; Return immediately to main menu, servo holds new pos
+        ; Wait about 1 second so the user sees the "Dispensing" screen
+        ; and the servo has time to finish moving.
+        LDR     R2, =8000000         ; Approx 1s at 16MHz (3-4 cycles per loop)
+MSD_FinalDelay
+        SUBS    R2, R2, #1
+        BNE     MSD_FinalDelay
+
+        ; Return to previous state
+        LDR     R4, =g_pre_med_state
+        LDR     R5, [R4]
         LDR     R4, =g_sys_state
-        MOVS    R5, #STATE_MAIN_MENU
         STR     R5, [R4]
 
         POP     {R4-R7, PC}

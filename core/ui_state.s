@@ -6,6 +6,7 @@
         AREA    UI_STATE_DATA, DATA, READWRITE
         ALIGN
 breath_ui_tick  SPACE   4
+vein_ui_tick    SPACE   4       ; throttle vein wave update rate
 
         AREA    UI_STATE, CODE, READONLY
         THUMB
@@ -24,6 +25,8 @@ breath_ui_tick  SPACE   4
         IMPORT  g_hr_red_raw
         IMPORT  g_hr_ir_raw
         IMPORT  g_smoke_ignore_counter
+        IMPORT  g_pre_smoke_state
+        IMPORT  g_pre_med_state
         IMPORT  g_med_wait_ui
         
         IMPORT  TFT_Clear_Screen
@@ -56,7 +59,15 @@ breath_ui_tick  SPACE   4
         IMPORT  TFT_Render_Vision
         IMPORT  TFT_Render_Vision_Res
         
+        IMPORT  TFT_Render_Vein
+        IMPORT  TFT_Update_Vein_Wave
+        IMPORT  VEIN_Reset_Calibration
+        IMPORT  TFT_Render_Stress
+        IMPORT  TFT_Update_Stress_Values
+        IMPORT  TFT_Render_More_Menu
+        
         IMPORT  MED_StartFromDisplayedMinutes
+        IMPORT  MOT_StopNow
 
 COLOR_BLACK         EQU     0x0000
 COLOR_WHITE         EQU     0xFFFF
@@ -80,18 +91,35 @@ UI_Update FUNCTION
         
         TST     R1, #Smoke_Alert_Flag
         BEQ.W   UI_Handle_Input_Then_Route
-        
-        LDR     R4, =g_smoke_ignore_counter
+
+        ; --- State protection: never interrupt medicine input/waiting ---
+        LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        CMP     R1, #STATE_MED_INPUT
+        BEQ.W   UI_Handle_Input_Then_Route
+        CMP     R1, #STATE_MED_WAITING
+        BEQ.W   UI_Handle_Input_Then_Route
+
+        ; --- Time-based cooldown: suppress for SMOKE_COOLDOWN_MS after dismiss ---
+        LDR     R4, =g_ms_ticks
         LDR     R5, [R4]
-        CMP     R5, #0
-        BEQ     UI_Trigger_Smoke_Alert
-        
-        SUBS    R5, R5, #1
-        STR     R5, [R4]
-        B       UI_Handle_Input_Then_Route
+        LDR     R4, =g_smoke_ignore_counter    ; stores the dismiss timestamp
+        LDR     R4, [R4]
+        SUBS    R5, R5, R4                     ; elapsed = now - dismiss_tick
+        LDR     R4, =SMOKE_COOLDOWN_MS
+        CMP     R5, R4
+        BLO.W   UI_Handle_Input_Then_Route     ; still within 5-second cooldown
 
 UI_Trigger_Smoke_Alert
+        ; Save current state before smoke alert (only if not already alerting)
         LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        CMP     R1, #STATE_SMOKE_ALERT
+        BEQ     UI_Smoke_Already
+        LDR     R2, =g_pre_smoke_state
+        STR     R1, [R2]
+UI_Smoke_Already
+        ; Now switch to smoke alert
         MOVS    R1, #STATE_SMOKE_ALERT
         STR     R1, [R0]
         B       UI_Handle_Input_Then_Route
@@ -113,33 +141,39 @@ UI_Handle_Input_Then_Route
         BL      TFT_Clear_Screen
         
         CMP     R4, #STATE_MAIN_MENU
-        BEQ     UI_Render_Main_Menu
+        BEQ.W   UI_Render_Main_Menu
         CMP     R4, #STATE_SANITIZING
-        BEQ     UI_Render_Sanitizing
+        BEQ.W   UI_Render_Sanitizing
         CMP     R4, #STATE_HEART_RATE
-        BEQ     UI_Render_Heart_Rate
+        BEQ.W   UI_Render_Heart_Rate
         CMP     R4, #STATE_BREATHING
-        BEQ     UI_Render_Breathing
+        BEQ.W   UI_Render_Breathing
         CMP     R4, #STATE_MED_INPUT
-        BEQ     UI_Render_Med_Input
+        BEQ.W   UI_Render_Med_Input
         CMP     R4, #STATE_MED_WAITING
-        BEQ.W     UI_Render_Med_Waiting
+        BEQ.W   UI_Render_Med_Waiting
         CMP     R4, #STATE_MED_ALERT
-        BEQ     UI_Render_Med_Alert
+        BEQ.W   UI_Render_Med_Alert
         CMP     R4, #STATE_MED_DISPENSE
-        BEQ     UI_Render_Med_Dispense
+        BEQ.W   UI_Render_Med_Dispense
         CMP     R4, #STATE_SMOKE_ALERT
-        BEQ     UI_Render_Smoke_ALERT
+        BEQ.W   UI_Render_Smoke_ALERT
         CMP     R4, #STATE_TEMP
-        BEQ     UI_Render_Temp
+        BEQ.W   UI_Render_Temp
         CMP     R4, #STATE_PPG_WAVE
-        BEQ     UI_Render_PPG_Wave
+        BEQ.W   UI_Render_PPG_Wave
         CMP     R4, #STATE_VISION
-        BEQ     UI_Render_Vision
+        BEQ.W   UI_Render_Vision
         CMP     R4, #STATE_VISION_RES
-        BEQ     UI_Render_Vision_Res
+        BEQ.W   UI_Render_Vision_Res
+        CMP     R4, #STATE_VEIN_FINDER
+        BEQ.W   UI_Render_Vein
         CMP     R4, #STATE_MOTION
         BEQ.W   UI_Render_Motion
+        CMP     R4, #STATE_STRESS
+        BEQ.W   UI_Render_Stress
+        CMP     R4, #STATE_MORE_MENU
+        BEQ.W   UI_Render_More_Menu
         
         B       UI_EXIT
         ENDFUNC
@@ -154,19 +188,25 @@ UI_Partial_Update FUNCTION
         LDR     R1, [R4]
         
         CMP     R1, #STATE_MAIN_MENU
-        BEQ     UI_Load_Smoke_Level
+        BEQ.W   UI_Load_Smoke_Level
         CMP     R1, #STATE_SMOKE_ALERT
-        BEQ     UI_Load_Smoke_Level
+        BEQ.W   UI_Load_Smoke_Level
+        CMP     R1, #STATE_MORE_MENU
+        BEQ.W   UI_Load_Smoke_Level
         CMP     R1, #STATE_BREATHING
-        BEQ     UI_Load_Breath_Level
+        BEQ.W   UI_Load_Breath_Level
         CMP     R1, #STATE_HEART_RATE
-        BEQ     UI_Load_Heart_Values
+        BEQ.W   UI_Load_Heart_Values
         CMP     R1, #STATE_MED_INPUT
         BEQ.W   UI_Update_Med_Number
         CMP     R1, #STATE_TEMP
-        BEQ     UI_Load_Temp_Values
+        BEQ.W   UI_Load_Temp_Values
         CMP     R1, #STATE_PPG_WAVE
-        BEQ     UI_Update_PPG_Wave
+        BEQ.W   UI_Update_PPG_Wave
+        CMP     R1, #STATE_VEIN_FINDER
+        BEQ.W   UI_Update_Vein
+        CMP     R1, #STATE_STRESS
+        BEQ.W   UI_Load_Stress_Values
         
         B       UI_EXIT
         ENDFUNC
@@ -325,7 +365,15 @@ Handle_Smoke_Alert FUNCTION
         LTORG
 
 Handle_Med_Alert FUNCTION
+        ; Save current state before med alert (only if not already alerting)
         LDR     R0, =g_sys_state
+        LDR     R1, [R0]
+        CMP     R1, #STATE_MED_ALERT
+        BEQ     Med_Already
+        LDR     R2, =g_pre_med_state
+        STR     R1, [R2]
+Med_Already
+        ; Now switch to med alert
         MOVS    R1, #STATE_MED_ALERT
         STR     R1, [R0]
         B       UI_Handle_Input_Then_Route
@@ -349,33 +397,39 @@ UI_Update_Recheck FUNCTION
         BL      TFT_Clear_Screen
         
         CMP     R4, #STATE_MAIN_MENU
-        BEQ     UI_Render_Main_Menu
+        BEQ.W   UI_Render_Main_Menu
         CMP     R4, #STATE_SANITIZING
-        BEQ     UI_Render_Sanitizing
+        BEQ.W   UI_Render_Sanitizing
         CMP     R4, #STATE_HEART_RATE
-        BEQ     UI_Render_Heart_Rate
+        BEQ.W   UI_Render_Heart_Rate
         CMP     R4, #STATE_BREATHING
-        BEQ     UI_Render_Breathing
+        BEQ.W   UI_Render_Breathing
         CMP     R4, #STATE_MED_INPUT
-        BEQ     UI_Render_Med_Input
+        BEQ.W   UI_Render_Med_Input
         CMP     R4, #STATE_MED_WAITING
-        BEQ.W     UI_Render_Med_Waiting
+        BEQ.W   UI_Render_Med_Waiting
         CMP     R4, #STATE_MED_ALERT
-        BEQ     UI_Render_Med_Alert
+        BEQ.W   UI_Render_Med_Alert
         CMP     R4, #STATE_MED_DISPENSE
-        BEQ     UI_Render_Med_Dispense
+        BEQ.W   UI_Render_Med_Dispense
         CMP     R4, #STATE_SMOKE_ALERT
-        BEQ     UI_Render_Smoke_ALERT
+        BEQ.W   UI_Render_Smoke_ALERT
         CMP     R4, #STATE_TEMP
-        BEQ     UI_Render_Temp
+        BEQ.W   UI_Render_Temp
         CMP     R4, #STATE_PPG_WAVE
-        BEQ     UI_Render_PPG_Wave
+        BEQ.W   UI_Render_PPG_Wave
         CMP     R4, #STATE_VISION
-        BEQ     UI_Render_Vision
+        BEQ.W   UI_Render_Vision
         CMP     R4, #STATE_VISION_RES
-        BEQ     UI_Render_Vision_Res
+        BEQ.W   UI_Render_Vision_Res
+        CMP     R4, #STATE_VEIN_FINDER
+        BEQ.W   UI_Render_Vein
         CMP     R4, #STATE_MOTION
         BEQ.W   UI_Render_Motion
+        CMP     R4, #STATE_STRESS
+        BEQ.W   UI_Render_Stress
+        CMP     R4, #STATE_MORE_MENU
+        BEQ.W   UI_Render_More_Menu
         B       UI_EXIT
         ENDFUNC
         ALIGN
@@ -443,6 +497,14 @@ UI_Handle_Input_Continue
         BEQ.W   Input_Vision
         CMP     R1, #STATE_VISION_RES
         BEQ.W   Input_Exit_State
+        CMP     R1, #STATE_VEIN_FINDER
+        BEQ.W   Input_Exit_State
+        CMP     R1, #STATE_MOTION
+        BEQ.W   Input_Motion_Exit
+        CMP     R1, #STATE_STRESS
+        BEQ.W   Input_Exit_State
+        CMP     R1, #STATE_MORE_MENU
+        BEQ.W   Input_More_Menu
         
         B.W     UI_Handle_Input_EXIT
         ENDFUNC
@@ -486,28 +548,11 @@ MM_try5
         STR     R2, [R5]
         B.W     UI_Handle_Input_EXIT
 MM_try6
-        CMP     R0, #KEY_6
+        ; Key 0 opens the More sub-menu (Vision / Vein / Stress)
+        CMP     R0, #KEY_0
         BNE.W   UI_Handle_Input_EXIT
-        MOVS    R2, #STATE_VISION
+        MOVS    R2, #STATE_MORE_MENU
         STR     R2, [R5]
-
-        ; Reset Vision Variables
-        MOVS    R3, #0
-        LDR     R2, =g_vision_level
-        STR     R3, [R2]
-        LDR     R2, =g_vision_ring_idx
-        STR     R3, [R2]
-        LDR     R2, =g_vision_level_score
-        STR     R3, [R2]
-
-        ; Randomize first dir
-        LDR     R2, =g_ms_ticks
-        LDR     R2, [R2]
-        MOVS    R0, #3
-        ANDS    R2, R2, R0
-        LDR     R3, =g_vision_dirs
-        STR     R2, [R3]
-        
         B.W     UI_Handle_Input_EXIT
         ENDFUNC
         ALIGN
@@ -551,10 +596,12 @@ Input_Exit_State FUNCTION
 Input_Smoke_Alert FUNCTION
         CMP     R0, #KEY_D
         BNE.W   UI_Handle_Input_EXIT
-        MOVS    R2, #STATE_MAIN_MENU
+        LDR     R2, =g_pre_smoke_state
+        LDR     R2, [R2]
         STR     R2, [R5]
-        LDR     R2, =g_smoke_ignore_counter
-        LDR     R3, =SMOKE_IGNORE_ITERATIONS
+        LDR     R2, =g_smoke_ignore_counter    ; store dismiss timestamp
+        LDR     R3, =g_ms_ticks
+        LDR     R3, [R3]
         STR     R3, [R2]
         LDR     R2, =g_alarm_flags
         LDR     R3, [R2]
@@ -575,6 +622,11 @@ Input_Med_Input FUNCTION
         LDR     R3, [R2]
         CMP     R3, #0
         BEQ.W   UI_Handle_Input_EXIT
+        ; Set the return-to state before starting the countdown
+        ; so MED_WAITING knows where to go after the confirmation screen
+        LDR     R2, =g_pre_med_state
+        MOVS    R3, #STATE_MAIN_MENU
+        STR     R3, [R2]
         BL      MED_StartFromDisplayedMinutes
         B.W     UI_Handle_Input_EXIT
 MI_try_B
@@ -590,7 +642,8 @@ MI_try_C
         LDR     R2, =g_med_timer
         MOVS    R3, #0
         STR     R3, [R2]
-        MOVS    R2, #STATE_MAIN_MENU
+        LDR     R2, =g_pre_med_state
+        LDR     R2, [R2]
         STR     R2, [R5]
         B.W     UI_Handle_Input_EXIT
 MI_try_digits
@@ -678,7 +731,8 @@ MA_try_C
         LDR     R3, [R2]
         BIC     R3, R3, #Med_Alert_Flag
         STR     R3, [R2]
-        MOVS    R2, #STATE_MAIN_MENU
+        LDR     R2, =g_pre_med_state
+        LDR     R2, [R2]
         STR     R2, [R5]
         B       UI_Handle_Input_EXIT
         ENDFUNC
@@ -689,7 +743,7 @@ MA_try_C
 ; Input_Vision
 ; =============================================================================
 Input_Vision FUNCTION
-        PUSH    {R4, LR}                ; save &g_keycode (R4) and LR
+        PUSH    {R4, LR}                
         
         CMP     R0, #KEY_0
         BNE     Check_Vis_Up
@@ -726,12 +780,11 @@ Vis_Check_Dir
         LSLS    R1, R7, #2
         LDR     R3, [R3, R1]
 
-        MOVS    R6, #0                  ; Assume Wrong (R6 = 0)
+        MOVS    R6, #0                  
         CMP     R4, R3
         BNE     Vis_Record_Result
         
-        ; Correct! Update Score
-        MOVS    R6, #1                  ; Set Right (R6 = 1)
+        MOVS    R6, #1                  
         LDR     R3, =g_vision_level_score
         LDR     R4, [R3]
         ADDS    R4, R4, #1
@@ -743,27 +796,24 @@ Vis_Record_Result
         STR     R6, [R3, R4]
         
         ADDS    R7, R7, #1
-        STR     R7, [R2]                ; save ring_idx
+        STR     R7, [R2]                
         
         CMP     R7, #3
         BLO     Vis_Next_Ring
 
-        ; Check if they passed the level (score >= 2)
         LDR     R3, =g_vision_level_score
         LDR     R4, [R3]
         CMP     R4, #2
         BLO     Vis_Fail_Level
 
-        ; Passed! Go to next level
         LDR     R3, =g_vision_level
         LDR     R4, [R3]
         ADDS    R4, R4, #1
         STR     R4, [R3]
 
         CMP     R4, #5
-        BEQ     Vis_Pass_All            ; Passed all 5 levels
+        BEQ     Vis_Pass_All            
 
-        ; Setup next level
         MOVS    R3, #0
         LDR     R2, =g_vision_ring_idx
         STR     R3, [R2]
@@ -779,26 +829,24 @@ Vis_Pass_All
         B       Vis_Force_Redraw
 
 Vis_Next_Ring
-        ; Get initial random guess for new ring
         LDR     R2, =g_ms_ticks
         LDR     R2, [R2]
         MOVS    R0, #3
-        ANDS    R2, R2, R0       ; Candidate direction in R2
+        ANDS    R2, R2, R0       
 
 Vis_Check_Unique
-        MOVS    R1, #0           ; loop index i = 0 in R1
+        MOVS    R1, #0           
 Vis_Uniq_Loop
-        CMP     R1, R7           ; if i >= current ring_idx, candidate is uniquely new
+        CMP     R1, R7           
         BHS     Vis_Uniq_Found
 
         LDR     R3, =g_vision_dirs
-        LSLS    R0, R1, #2       ; offset = i * 4
-        LDR     R6, [R3, R0]     ; Load past direction from this level into R6
+        LSLS    R0, R1, #2       
+        LDR     R6, [R3, R0]     
 
-        CMP     R2, R6           ; Compare candidate with past direction
+        CMP     R2, R6           
         BNE     Vis_Uniq_Next
 
-        ; Conflict found! Increment candidate, wrap at 3, and restart check from 0
         ADDS    R2, R2, #1
         MOVS    R0, #3
         ANDS    R2, R2, R0
@@ -809,7 +857,6 @@ Vis_Uniq_Next
         B       Vis_Uniq_Loop
 
 Vis_Uniq_Found
-        ; R2 is now guaranteed unique! Store it for the current ring.
         LDR     R3, =g_vision_dirs
         LSLS    R0, R7, #2
         STR     R2, [R3, R0]     
@@ -833,6 +880,122 @@ UI_Handle_Input_EXIT FUNCTION
         MOVS    R2, #KEY_NONE
         STR     R2, [R4]
         POP     {R4, R5, PC}
+        ENDFUNC
+        ALIGN
+        LTORG
+
+UI_Render_Vein FUNCTION
+        BL      TFT_Render_Vein
+        B       UI_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+UI_Update_Vein FUNCTION
+        LDR     R0, =g_ms_ticks
+        LDR     R1, [R0]
+        LDR     R0, =vein_ui_tick
+        LDR     R2, [R0]
+        SUBS    R3, R1, R2
+        CMP     R3, #30         ; 30ms = ~33Hz update rate
+        BLO     UI_EXIT_Vein
+        STR     R1, [R0]
+
+        BL      TFT_Update_Vein_Wave
+UI_EXIT_Vein
+        B       UI_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+UI_Render_Stress FUNCTION
+        BL      TFT_Render_Stress
+        B       UI_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+UI_Load_Stress_Values FUNCTION
+        BL      TFT_Update_Stress_Values
+        B       UI_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+UI_Render_More_Menu FUNCTION
+        BL      TFT_Render_More_Menu
+        B       UI_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+; =============================================================================
+; Input_More_Menu  — handles keypad inside the More sub-menu
+; 6 = Vision Test   7 = Vein Finder   8 = Stress   0/D = Back to Main Menu
+; =============================================================================
+Input_More_Menu FUNCTION
+        CMP     R0, #KEY_6
+        BNE     IM_try7
+
+        ; Vision Test — reset state then enter
+        MOVS    R2, #STATE_VISION
+        STR     R2, [R5]
+        MOVS    R3, #0
+        LDR     R2, =g_vision_level
+        STR     R3, [R2]
+        LDR     R2, =g_vision_ring_idx
+        STR     R3, [R2]
+        LDR     R2, =g_vision_level_score
+        STR     R3, [R2]
+        LDR     R2, =g_ms_ticks
+        LDR     R2, [R2]
+        MOVS    R0, #3
+        ANDS    R2, R2, R0
+        LDR     R3, =g_vision_dirs
+        STR     R2, [R3]
+        B.W     UI_Handle_Input_EXIT
+
+IM_try7
+        CMP     R0, #KEY_7
+        BNE     IM_try8
+        MOVS    R2, #STATE_VEIN_FINDER
+        STR     R2, [R5]
+        BL      VEIN_Reset_Calibration
+        B.W     UI_Handle_Input_EXIT
+
+IM_try8
+        CMP     R0, #KEY_8
+        BNE     IM_try_back
+        MOVS    R2, #STATE_STRESS
+        STR     R2, [R5]
+        B.W     UI_Handle_Input_EXIT
+
+IM_try_back
+        ; KEY_C = # = back to main menu (same as all other screens)
+        CMP     R0, #KEY_C
+        BNE.W   UI_Handle_Input_EXIT
+IM_back
+        MOVS    R2, #STATE_MAIN_MENU
+        STR     R2, [R5]
+        B.W     UI_Handle_Input_EXIT
+        ENDFUNC
+        ALIGN
+        LTORG
+
+; =============================================================================
+; Input_Motion_Exit — Force-stop motors then go back to main menu
+; # (KEY_C) is the exit key, consistent with all other feature screens
+; =============================================================================
+Input_Motion_Exit FUNCTION
+        CMP     R0, #KEY_D          ; # button maps to KEY_D via MCI_State_ExitOnly
+        BNE.W   UI_Handle_Input_EXIT
+
+        ; Stop motors immediately before leaving
+        BL      MOT_StopNow
+
+        MOVS    R2, #STATE_MAIN_MENU
+        STR     R2, [R5]
+        B.W     UI_Handle_Input_EXIT
         ENDFUNC
         ALIGN
         LTORG

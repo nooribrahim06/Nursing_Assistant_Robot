@@ -20,7 +20,7 @@
         EXPORT  g_motion_state
         
         EXPORT  g_motion_mode
-        ; --- Vision Test globals (UPDATED) ---
+        ; --- Vision Test globals ---
         EXPORT  g_vision_level
         EXPORT  g_vision_ring_idx
         EXPORT  g_vision_level_score
@@ -41,6 +41,8 @@
         EXPORT  g_warmup_cnt
         EXPORT  g_snooze_cnt
         EXPORT  g_smoke_ignore_counter
+        EXPORT  g_pre_smoke_state
+        EXPORT  g_pre_med_state
         EXPORT  g_med_wait_ui
         EXPORT  g_ms_ticks
         EXPORT  g_last_med_tick
@@ -49,11 +51,29 @@
         EXPORT  g_ir_ready
         EXPORT  g_ir_raw_code
 
+        ; --- Vein Finder globals ---
+        EXPORT  g_vein_raw
+        EXPORT  g_vein_base
+        EXPORT  g_vein_diff
+        EXPORT  g_vein_calib_cnt
+        EXPORT  g_vein_plot_x
+        EXPORT  g_station_detected
+        EXPORT  g_ultrasonic_stop_cnt
+        EXPORT  g_last_ultra_tick
+        EXPORT  g_last_ultra_dist
+        EXPORT  g_stress_score
+
 ; --- System core globals ---
 g_sys_state             SPACE   4
 g_prev_state            SPACE   4
 g_alarm_flags           SPACE   4
 g_smoke_ignore_counter  SPACE   4
+g_pre_smoke_state       SPACE   4
+g_pre_med_state         SPACE   4
+g_station_detected      SPACE   4
+g_ultrasonic_stop_cnt   SPACE   4
+g_last_ultra_tick       SPACE   4
+g_last_ultra_dist       SPACE   4
 
 ; --- Input / UI globals ---
 g_keycode               SPACE   4
@@ -63,8 +83,8 @@ g_ms_ticks              SPACE   4
 g_last_med_tick         SPACE   4
 
 ; --- IR globals ---
-g_ir_ready              SPACE   4       ; 1 when a fresh IR frame is decoded
-g_ir_raw_code           SPACE   4       ; full 32-bit NEC code
+g_ir_ready              SPACE   4       
+g_ir_raw_code           SPACE   4       
 
 ; --- Sensor data globals ---
 g_smoke_level           SPACE   4
@@ -90,13 +110,23 @@ g_snooze_cnt            SPACE   4
 
 ; --- Motion / actuation globals ---
 g_motion_state          SPACE   4
+g_motion_mode           SPACE   4       
 
-g_motion_mode           SPACE   4       ; 1=LINE, 2=PHONE
-; --- Vision Test globals (UPDATED) ---
-g_vision_level          SPACE   4   ; 0 to 4 (5 levels)
-g_vision_ring_idx       SPACE   4   ; 0 to 2 (3 rings per level)
-g_vision_level_score    SPACE   4   ; 0 to 3 (correct answers this level)
-g_vision_results        SPACE   16  ; Stores right/wrong for rings
-g_vision_dirs           SPACE   16  ; Stores direction for rings
+; --- Vision Test globals ---
+g_vision_level          SPACE   4   
+g_vision_ring_idx       SPACE   4   
+g_vision_level_score    SPACE   4   
+g_vision_results        SPACE   16  
+g_vision_dirs           SPACE   16  
+
+; --- Vein Finder data ---
+g_vein_raw              SPACE   4
+g_vein_base             SPACE   4
+g_vein_diff             SPACE   4
+g_vein_calib_cnt        SPACE   4
+g_vein_plot_x           SPACE   4
+
+; --- Stress Level ---
+g_stress_score          SPACE   4
 
         END

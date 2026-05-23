@@ -99,6 +99,14 @@ ADC_CR2_ADON        EQU     0x00000001
 ADC_CR2_SWSTART     EQU     0x40000000
 ADC_SR_EOC          EQU     0x00000002
 
+; ADC Analog Watchdog
+ADC_HTR             EQU     0x24
+ADC_LTR             EQU     0x28
+ADC_CR1_AWDEN       EQU     (1 << 23)
+ADC_CR1_AWDSGL      EQU     (1 << 9)
+ADC_CR1_AWDIE       EQU     (1 << 6)
+ADC_SR_AWD          EQU     (1 << 0)
+
 ;-----------------------------------------------------------------------------
 ; Outputs
 ;-----------------------------------------------------------------------------
@@ -132,8 +140,9 @@ I2C_SDA_PIN         EQU     9
 ; Line tracker
 ;-----------------------------------------------------------------------------
 LINE_LEFT           EQU     12
-LINE_CENTER         EQU     13
+LINE_CENTER         EQU     15
 LINE_RIGHT          EQU     14
+STATION_IR_PIN      EQU     13
 
 ;-----------------------------------------------------------------------------
 ; Alarm flags
@@ -141,6 +150,7 @@ LINE_RIGHT          EQU     14
 Smoke_Alert_Flag        EQU     0x00000001
 Med_Alert_Flag          EQU     0x00000002
 SMOKE_IGNORE_ITERATIONS EQU     200
+SMOKE_COOLDOWN_MS       EQU     5000    ; 5-second guaranteed cooldown after dismiss
 
 ;-----------------------------------------------------------------------------
 ; System states
@@ -159,6 +169,9 @@ STATE_TEMP          EQU     10
 STATE_PPG_WAVE      EQU     11
 STATE_VISION        EQU     12
 STATE_VISION_RES    EQU     13
+STATE_VEIN_FINDER   EQU     14
+STATE_STRESS        EQU     16      ; Stress Level feature
+STATE_MORE_MENU     EQU     17      ; Secondary menu page (Vision / Vein / Stress)
 
 STATE_INVALID       EQU     0xFFFFFFFF
 
@@ -251,12 +264,12 @@ NVIC_ISER1          EQU     0xE000E104
 ; TIM2 for 1 us IR timing
 ;-----------------------------------------------------------------------------
 TIM2_BASE           EQU     0x40000000
+TIM5_BASE           EQU     0x40000C00
 TIM_CR1             EQU     0x00
 TIM_CNT             EQU     0x24
 TIM_PSC             EQU     0x28
 TIM_ARR             EQU     0x2C
 TIM_EGR             EQU     0x14
-
 
 ;-----------------------------------------------------------------------------
 ; Sanitizing pump / hand sensor
@@ -265,10 +278,20 @@ SAN_GPIO_PORT        EQU     GPIOA_BASE
 SAN_SENSOR_PIN       EQU     4
 SAN_RELAY_PIN        EQU     5
 SAN_PUMP_DELAY       EQU     200000
+        END
+
+;=============================================================================
+; bluetooth_constants.s
+; HC-05 / USART2 Bluetooth constants for STM32F401RC
+;
+; PA2 = USART2_TX -> HC-05 RX
+; PA3 = USART2_RX <- HC-05 TX
+; 9600 baud, 8 data bits, no parity, 1 stop bit
+;=============================================================================
 
 ;-----------------------------------------------------------------------------
-; Bluetooth / USART2
-;-----------------------------------------------------------------------------
+; USART2 peripheral
+;---------------------------------------------- -------------------------------
 BT_USART2_BASE          EQU     0x40004400
 
 BT_USART_SR             EQU     0x00
@@ -287,8 +310,14 @@ BT_USART_CR1_UE         EQU     0x00002000
 
 ; USART2 clock is RCC_APB1ENR bit 17
 BT_RCC_USART2_EN        EQU     0x00020000
+
+; 16 MHz / 9600 baud, OVER8 = 0 => BRR approx 0x0683
+; If your project later changes APB1 clock, update this value only.
 BT_USART2_BRR_9600      EQU     0x00000683
 
+;-----------------------------------------------------------------------------
+; GPIO pins / alternate function
+;-----------------------------------------------------------------------------
 BT_TX_PIN               EQU     2       ; PA2
 BT_RX_PIN               EQU     3       ; PA3
 BT_USART_AF             EQU     7       ; AF7 = USART2
@@ -309,47 +338,40 @@ BT_GPIOA_PA3_PULLUP         EQU 0x00000040
 BT_GPIOA_PA2_PA3_SPEED_MASK EQU 0x000000F0
 BT_GPIOA_PA2_PA3_SPEED_FAST EQU 0x000000A0
 
+;-----------------------------------------------------------------------------
 ; RX/TX buffers
+;-----------------------------------------------------------------------------
 BT_RX_BUFFER_SIZE       EQU     80
 BT_RX_LAST_INDEX        EQU     79
 BT_TX_BUFFER_SIZE       EQU     192
 BT_TX_LAST_INDEX        EQU     191
 BT_NUM_BUFFER_SIZE      EQU     12
 
+;-----------------------------------------------------------------------------
 ; ASCII
+;-----------------------------------------------------------------------------
 BT_ASCII_CR             EQU     13
 BT_ASCII_LF             EQU     10
 BT_ASCII_0              EQU     48
 
-; Bluetooth logic states
+;-----------------------------------------------------------------------------
+; Bluetooth command values shared with motion member
+;-----------------------------------------------------------------------------
+BT_CMD_NONE             EQU     0
+
 BT_MODE_LINE            EQU     1
 BT_MODE_PHONE           EQU     2
+
 BT_DIR_FWD              EQU     1
 BT_DIR_BACK             EQU     2
 BT_DIR_LEFT             EQU     3
 BT_DIR_RIGHT            EQU     4
 BT_DIR_STOP             EQU     5
 
+;-----------------------------------------------------------------------------
+; Reporting
+;-----------------------------------------------------------------------------
 BT_REPORT_PERIOD_MS     EQU     250
 BT_PATIENT_ID_TEXT      EQU     001
-
-;-----------------------------------------------------------------------------
-; Motion Control (Phone Override)
-;-----------------------------------------------------------------------------
-MOTION_MODE_LINE        EQU     1
-MOTION_MODE_PHONE       EQU     2
-
-PHONE_DIR_STOP          EQU     5
-PHONE_DIR_FWD           EQU     1
-PHONE_DIR_BACK          EQU     2
-PHONE_DIR_LEFT          EQU     3
-PHONE_DIR_RIGHT         EQU     4
-
-PHONE_TIMEOUT_MS        EQU     2000
-
-PHONE_SPEED             EQU     340
-PHONE_TURN_FAST         EQU     480
-PHONE_TURN_SLOW         EQU     280
-PHONE_PIVOT_SPEED       EQU     300
 
         END
