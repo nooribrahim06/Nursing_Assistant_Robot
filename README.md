@@ -111,7 +111,7 @@ The user interface is driven by an IR Remote Control mapped to a central state m
              ┌────────────────────────────────────┴────────────────────────────────────┐
              ▼                                                                         ▼
    [STM32F401RC MCU Core]                                                       [Actuators & Sensors]
-    ├─ SPI1 Bus ───────────────────────────────────────────────────────────────► ILI9341 2.8" TFT Display
+    ├─ SPI1 Bus ───────────────────────────────────────────────────────────────► ILI9341 3.2" TFT Display
     ├─ I2C1 Bus ───────────────────────────────────────────────────────────────► MAX30102 Pulse Oximeter
     ├─ USART2 ─────────────────────────────────────────────────────────────────► HC-05 Bluetooth Module
     ├─ ADC1 (PA0/PA1/PA7) ─────────────────────────────────────────────────────► MQ-2, Breathing, Vein Sensors
@@ -126,7 +126,7 @@ The user interface is driven by an IR Remote Control mapped to a central state m
 
 1. **Chassis & Motion**: 6-wheel drive chassis, 6 TT DC Motors driven by two motor drivers, 1 line tracker sensor board (3 IR sensors on `PB12–PB14`).
 2. **Core MCU**: STM32F401RC (ARM Cortex-M4, 16 MHz), ST-Link V2 SWD debugger, 3x 18650 Li-ion batteries (11.1V), 5V step-down buck converter.
-3. **Display & UI**: ILI9341 2.8" Color TFT LCD over SPI1, piezo buzzer on `PB4`, IR receiver on `PB10` + IR remote.
+3. **Display & UI**: ILI9341 3.2" Color TFT LCD over SPI1, piezo buzzer on `PB4`, IR receiver on `PB10` + IR remote.
 4. **Actuators**: SG90/MG995 servo on `PA6` (TIM3 CH1) for medicine dispensing, mini submersible 5V water pump via relay on `PA5`.
 5. **Sensors**: MAX30102 pulse oximeter on I2C1 (`PB8/PB9`), MQ-2 gas sensor on `PA1` (ADC CH1), HC-SR04 sonar on `PC15` (Trig) / `PC14` (Echo), sanitizer proximity IR on `PA4`, bedside IR alignment receiver.
 6. **Discrete Components**: Safety diodes, push-buttons, IR LEDs, pull-down resistors, 74HC logic latches, decoders, battery holder, 3 breadboards, and jumper wires.
@@ -255,7 +255,7 @@ g_ms_ticks              SPACE   4       ; Uptime clock in milliseconds
 
 ### 🔄 Super-Loop Scheduler (main.s)
 
-**File:** [core/main.s](file:///d:/CMP-year%201/Second%20Term/Micro/Project/nurse1/core/main.s)
+**File:** `core/main.s`
 
 The main loop runs continuously after boot, coordinating non-blocking tasks.
 
@@ -273,15 +273,16 @@ The main loop runs continuously after boot, coordinating non-blocking tasks.
 │             MAIN LOOP (Continuous)           │
 │                                              │
 │  1. Check incoming Bluetooth serial stream   │
-│  2. Handle Bluetooth motion mode overrides   │
-│  3. Read & debounce IR Remote commands       │
-│  4. Run environmental fire check (MQ-2 ADC)  │
-│  5. Run Background Tasks (Meds, buzzer, etc.)│
-│  6. Execute active state logic (vein, ppg)   │
-│  7. Check if 100ms has elapsed since draw    │
+│  2. Inject virtual keypad presses from BT    │
+│  3. Handle Bluetooth motion mode overrides   │
+│  4. Read & debounce IR Remote commands       │
+│  5. Run environmental fire check (MQ-2 ADC)  │
+│  6. Run Background Tasks (Meds, buzzer, etc.)│
+│  7. Execute active state logic (vein, ppg)   │
+│  8. Check if 100ms has elapsed since draw    │
 │     ├─ YES: Trigger TFT UI Update screen     │
 │     └─ NO:  Skip draw step                   │
-│  8. Run State Transition Cleanup routines    │
+│  9. Run State Transition Cleanup routines    │
 └──────────────────────┬───────────────────────┘
                        │
                        ▼
@@ -291,6 +292,7 @@ The main loop runs continuously after boot, coordinating non-blocking tasks.
 ```assembly
 Main_Loop
         BL      BT_RxTask                   ; Check incoming Bluetooth serial stream
+        BL      Main_ProcessBTKeyInjection  ; Inject virtual keypad presses from BT
         BL      Main_ProcessBluetoothCmd    ; Handle driving mode overrides
         BL      Main_CheckIRInput           ; Debounce and check IR keypad inputs
         BL      Smoke_Check                 ; Read smoke sensor and check alarm flags
@@ -319,7 +321,7 @@ Main_SkipUI
 
 ### 🧭 Central State Machine (ui_state.s)
 
-**File:** [core/ui_state.s](file:///d:/CMP-year%201/Second%20Term/Micro/Project/nurse1/core/ui_state.s)
+**File:** `core/ui_state.s`
 
 Directs page routing based on the state machine variables. 
 
@@ -548,7 +550,7 @@ After this, any 16-bit color values sent via `TFT_WriteData16` fill the window l
 **ILI9341 Init sequence (`TFT_Init`):** After reset, the init sequence sends power control, VCOM, frame rate, display function, and finally MADCTL `0x28` (landscape orientation, BGR color order). `PIXFMT 0x55` sets RGB565 — 5 bits red, 6 bits green, 5 bits blue, 2 bytes per pixel.
 
 > **Simulation screenshot of TFT waveforms in Proteus:**
-> ![TFT SPI Simulation](imgs/tft_ui_menu.jpg)
+> ![TFT SPI Simulation](imgs/tft_ui_menu.png)
 
 ---
 
@@ -641,14 +643,15 @@ Uses substring matching rather than exact string equality. This means the app ca
 ; BT_Contains scans bt_rx_buffer byte-by-byte using BT_StartsWith at each position
 ; BT_StartsWith does a byte-by-byte comparison until the substring runs out (match) or a mismatch
 
-Check for "FWD"   -> BT_SetDirRequest(BT_DIR_FWD=1)  + BT_QueueACK
-Check for "BACK"  -> BT_SetDirRequest(BT_DIR_BACK=2) + BT_QueueACK
-Check for "LEFT"  -> BT_SetDirRequest(BT_DIR_LEFT=3) + BT_QueueACK
-Check for "RIGHT" -> BT_SetDirRequest(BT_DIR_RIGHT=4)+ BT_QueueACK
-Check for "STOP"  -> BT_SetDirRequest(BT_DIR_STOP=5) + BT_QueueACK
-Check for "PHONE" -> BT_SetModeRequest(BT_MODE_PHONE=2)+ BT_QueueACK
-Check for "LINE"  -> BT_SetModeRequest(BT_MODE_LINE=1) + BT_QueueACK
-Check for "OFF"   -> check if also contains "MED" or "SMOKE" -> clear the respective alarm flag
+Check for "FWD"        -> BT_SetDirRequest(BT_DIR_FWD=1)   + BT_QueueACK
+Check for "BACK"       -> BT_SetDirRequest(BT_DIR_BACK=2)  + BT_QueueACK
+Check for "LEFT"       -> BT_SetDirRequest(BT_DIR_LEFT=3)  + BT_QueueACK
+Check for "RIGHT"      -> BT_SetDirRequest(BT_DIR_RIGHT=4) + BT_QueueACK
+Check for "STOP"       -> BT_SetDirRequest(BT_DIR_STOP=5)  + BT_QueueACK
+Check for "PHONE"      -> BT_SetModeRequest(BT_MODE_PHONE=2)+ BT_QueueACK
+Check for "LINE"       -> BT_SetModeRequest(BT_MODE_LINE=1) + BT_QueueACK
+Check for "CMD=UI"     -> BT_Handle_UIKey + BT_QueueACK     (virtual keypad)
+Check for "OFF"        -> check if also contains "MED" or "SMOKE" -> clear alarm flag
 ```
 
 `BT_SetDirRequest` and `BT_SetModeRequest` both write to the shared RAM flags (`g_bt_motion_dir_request`, `g_bt_motion_mode_request`, `g_bt_cmd_ready = 1`) that the motion layer polls each cycle. Only one of the two request fields is set per command — the other is explicitly zeroed to prevent stale commands.
@@ -742,10 +745,7 @@ Returns the debounced state stored in `g_station_detected` (returns `1` if the r
 
 **Tricky part — Active-Low Signal & Ambient Noise Filtering:** Since the sensor output is active-low (pulls to `0` when sensing an IR beacon), raw readings must be inverted with `EOR R0, R0, #1`. Without the 5-sample debounce verification window, ambient light fluctuations in a hospital corridor or sensor jitter would trigger false stops, causing the robot to dock prematurely.
 
-> **IR Station Alignment Simulation Screenshot:**
-> ![IR Station Alignment Simulation](imgs/ir_station_sim.jpg)
 
----
 
 ## 📂 File-by-File Technical Deep Dive
 
@@ -967,34 +967,255 @@ Below is the implementation matrix for the robot's active features, detailing bo
 
 ---
 
+### 🔌 Bedside IR Beacon Selection Circuit — Hardware Deep Dive
+
+The challenge: a hospital ward may have **multiple bedsides**, but the robot must always dock at exactly **one** at a time. Rather than adding another microcontroller to arbitrate, a fully passive hardware circuit handles this using three inexpensive components.
+
+#### The Problem It Solves
+
+If two patients press their call buttons simultaneously, two IR beacons would emit at once. The robot's single IR receiver on `PB13` cannot tell them apart — it would detect a combined signal and navigate ambiguously between the two stations. The circuit ensures this situation is physically impossible: **only one IR transmitter can be powered at any moment**, regardless of how many buttons are pressed.
+
+#### Components
+
+| Component | Part | Role |
+|-----------|------|------|
+| **Latch push-buttons** | Momentary latching switches | Patient calls the robot by pressing and holding their bedside button |
+| **3-to-8 decoder** | 74HC238 | Converts the 3-bit binary station address into a single active output line |
+| **Isolation diodes** | Signal diodes (1N4148) | Prevent reverse current and cross-triggering between stations |
+| **IR LED transmitters** | 940nm IR LEDs | Emit the infrared beacon that the robot detects on `PB13` |
+
+#### How It Works — Step by Step
+
+**Step 1 — Patient presses a latch button.**
+Each bedside has a latching push-button. When pressed, it stores the call request mechanically (stays pressed until reset). The button outputs connect to the `A`, `B`, `C` select lines of the 74HC238 decoder, encoding which station is calling as a 3-bit binary number (Station 1 = `001`, Station 2 = `010`, Station 3 = `011`, etc.).
+
+**Step 2 — The 74HC238 decoder activates exactly one output.**
+The decoder reads the 3-bit address on its select lines and pulls exactly one of its eight outputs (`Y0`–`Y7`) HIGH. All other outputs remain LOW. This is the core hardware guarantee — the decoder's combinational logic makes it physically impossible for two outputs to be HIGH simultaneously for the same select combination.
+
+**Step 3 — Diode isolation routes power to one IR transmitter.**
+Each decoder output (`Y0`–`Y7`) connects to one IR LED transmitter through a series diode. The diodes serve two purposes:
+- **Forward direction**: current flows from the active decoder output through the diode to power the IR LED.
+- **Reverse direction**: the diode blocks any back-current from flowing from one output into another, preventing cross-triggering where an active LED on Y1 could inadvertently feed current back into Y2's circuit.
+
+**Step 4 — The active IR beacon emits.**
+Only the one IR LED connected to the active decoder output has a complete current path and emits infrared light at 940nm. All other IR LEDs remain off.
+
+**Step 5 — The robot detects and docks.**
+The robot's `PB13` IR receiver module sees the single active beacon. `StationIR_Update` debounces the signal over 5 samples and sets `g_station_detected = 1`. The `motion.s` guidance loop calls `MOT_StopNow`, halting the robot precisely at that bedside station.
+
+#### Why This Design Was Chosen
+
+**No microcontroller needed.** The entire arbitration is handled combinationally by the 74HC238. This removes firmware complexity, eliminates interrupt latency, and reduces BOM cost significantly.
+
+**Deterministic priority.** If multiple buttons are pressed simultaneously, the 74HC238 selects based on the binary value present on its select lines (whichever button combination produces the lowest or highest address wins). This gives predictable, repeatable behavior in a multi-patient scenario.
+
+**Diodes as one-way valves.** The diode network is the safety layer. Without diodes, an active HIGH on `Y1` could flow backward through the IR LED of station 2 and into the `Y2` output pin of the decoder — potentially damaging the IC or falsely illuminating two LEDs. The diodes make each output's power path strictly one-directional.
+
+**Hospital-safe single-source guarantee.** The robot always has exactly one docking target. This prevents ambiguous navigation in multi-room environments and ensures medication is delivered to the correct patient.
+
+#### Circuit Truth Table (74HC238 select lines → active IR beacon)
+
+| Station | Button Address (C B A) | Active Decoder Output | IR Beacon |
+|---------|------------------------|----------------------|-----------|
+| Station 1 | `0 0 1` | Y1 | LED 1 ON |
+| Station 2 | `0 1 0` | Y2 | LED 2 ON |
+| Station 3 | `0 1 1` | Y3 | LED 3 ON |
+| Station 4 | `1 0 0` | Y4 | LED 4 ON |
+| Station 5 | `1 0 1` | Y5 | LED 5 ON |
+| Station 6 | `1 1 0` | Y6 | LED 6 ON |
+| Station 7 | `1 1 1` | Y7 | LED 7 ON |
+| None / Reset | `0 0 0` | Y0 (unused) | All LEDs OFF |
+
+#### Proteus Simulation
+
+> ![IR Station Alignment Hardware Simulation](imgs/ir_station_sim.jpg)
+>
+> **Figure:** Proteus simulation of the low-cost IR bedside selection circuit. Latch buttons feed the `A/B/C` select lines of the 74HC238 decoder. The single active output powers one IR LED through a diode, while all other LEDs remain off. The robot's receiver on `PB13` picks up the isolated beacon signal.
+
+---
+
 ## 📱 Mobile App Control
 
-The robot can be driven manually via a custom **Robo Mobile App** that sends single-character Bluetooth commands over USART2 to the HC-05 module.
+The robot is controlled via the custom **RoboCare Mobile App** — a full-featured Android application for patient monitoring, robot motion control, and remote alert management over Bluetooth (HC-05 / USART2).
 
-![Robo App](imgs/app_screenshot.png)
-
-**Bluetooth command map (parsed in `motion_bt.s`):**
-
-| Char | Action |
-|------|--------|
-| `F` | Move Forward |
-| `B` | Move Backward |
-| `L` | Spin Left |
-| `R` | Spin Right |
-| `S` | Stop |
-
-When a Bluetooth command arrives, it sets a manual override flag that suppresses autonomous line tracking for 2 seconds. If no new command arrives within that window, the robot automatically resumes autonomous mode.
-
-The USART2 interrupt fills a circular ring buffer (`bluetooth_buffer.s`) in the background. The main loop calls `BT_RxTask` once per cycle to drain the buffer without blocking.
+**[▶ Download RoboCare APK (Google Drive)](https://drive.google.com/file/d/1s6VO7PZKef49Cyw4DefM6DDQRT3lJbKn/view?usp=sharing)**
 
 ---
 
-## 📷 Visual Walkthrough & Simulation
+### 📸 App Screenshots
 
-### Assembled Bedside Station IR Call Hardware Simulation
-![IR Station Bedside Call Simulation](imgs/ir_station_sim.jpg)
+| Home Screen | Patient List | Vitals Dashboard | Motion Control |
+|:-----------:|:------------:|:----------------:|:--------------:|
+| ![Home Screen](imgs/app1.jpg) | ![Patient List](imgs/app2.jpg) | ![Vitals Dashboard](imgs/app3.jpg) | ![Motion Control](imgs/app4.jpg) |
+
+**Home Screen** — Connect to HC-05 via Bluetooth, navigate to Patients, Bluetooth settings, or Motion Control.
+
+**Patient List** — Add, edit, and delete patient profiles (name, ID, room number). Tap a patient to begin live monitoring.
+
+**Vitals Dashboard** — Live BPM, SpO₂, Breathing level, Smoke level, Medication timer, and Alert status updated every 250ms from the robot's USART2 vitals stream. Save readings to patient history.
+
+**Motion Control** — Full D-Pad joystick to drive the robot manually. Supports Forward, Backward, Left, Right, Stop, and toggle between Phone Control and autonomous Line Tracker mode.
 
 ---
+
+### 🔑 App Features
+
+| Feature | Description |
+|---------|-------------|
+| **Bluetooth Connection** | Pair and connect to HC-05 module directly from the app |
+| **Patient Management** | Add, edit, and delete patient profiles (Name, ID, Room) |
+| **Live Vitals Dashboard** | Real-time BPM, SpO₂, Breath, Smoke level, Med timer, and Alert status |
+| **Save Readings** | Persist vitals snapshots per patient with history log |
+| **Motion Control** | D-Pad joystick to drive the robot (Forward, Back, Left, Right, Stop) |
+| **Phone / Line Mode** | Switch robot between manual phone control and autonomous line tracking |
+| **Remote Alert Dismiss** | Dismiss smoke and medication alerts over Bluetooth from the app |
+| **Virtual Keypad** | Send UI navigation keys (0–9, A–D, CAM_UP/DOWN/LEFT/RIGHT) to control all robot screens remotely |
+
+---
+
+### 📡 Bluetooth Command Protocol
+
+The app communicates with the robot over USART2 at **9600 baud** via the HC-05 module. Commands are plain ASCII strings terminated with `\r\n`.
+
+**Motion Commands** (parsed in `motion_bt.s` / `bluetooth.s`):
+
+| Command String | Action |
+|----------------|--------|
+| `DIR=FWD` | Move Forward |
+| `DIR=BACK` | Move Backward |
+| `DIR=LEFT` | Spin Left |
+| `DIR=RIGHT` | Spin Right |
+| `DIR=STOP` | Stop Motors |
+| `MODE=PHONE` | Enter manual phone-control mode |
+| `MODE=LINE` | Resume autonomous line tracking |
+| `OFF,SMOKE` | Dismiss active smoke alert |
+| `OFF,MED` | Dismiss active medication alert |
+
+**Virtual Keypad Commands** (parsed via `BT_Handle_UIKey` in `bluetooth.s`):
+
+| Command String | Key Injected | Effect |
+|----------------|-------------|--------|
+| `CMD=UI,KEY=0` … `KEY=9` | `KEY_0` … `KEY_9` | Navigate menus / select features |
+| `CMD=UI,KEY=A` … `KEY=D` | `KEY_A` … `KEY_D` | Function keys |
+| `CMD=UI,KEY=CAM_UP` | `KEY_UP` | D-Pad Up (Vision/Vein/Stress modes) |
+| `CMD=UI,KEY=CAM_DOWN` | `KEY_DOWN` | D-Pad Down |
+| `CMD=UI,KEY=CAM_LEFT` | `KEY_LEFT` | D-Pad Left |
+| `CMD=UI,KEY=CAM_RIGHT` | `KEY_RIGHT` | D-Pad Right |
+
+The `CAM_` prefix on directional keys ensures they **do not collide** with the robot's `DIR=LEFT/RIGHT` motion commands. The parser checks for `CMD=UI` first, routes through `BT_Handle_UIKey`, and stores the result in `g_bt_ui_key_request`. The main loop's `Main_ProcessBTKeyInjection` then writes this into `g_keycode` — making a virtual keypad press indistinguishable from a physical IR remote press.
+
+**Vitals Packet** (transmitted by the robot every 250 ms):
+```
+TYPE=VITALS,PATIENT=001,BPM=72,SPO2=98,BREATH=1840,SMOKE=120,MED=300,ALERT=NONE\r\n
+```
+
+---
+
+### 🛠️ Assembly Integration: Bluetooth Virtual Keypad
+
+The virtual keypad required coordinated changes across three assembly files to safely inject app D-Pad inputs into the robot's UI state machine without disturbing the motion command pipeline.
+
+#### 1. `bluetooth_buffer.s` — New Global Variable
+
+```assembly
+; Add to EXPORT list:
+EXPORT  g_bt_ui_key_request
+
+; Add below g_bt_last_rx_tick:
+g_bt_ui_key_request        DCD     0    ; KEY_x value from CMD=UI,KEY=... (0=none)
+```
+
+#### 2. `bluetooth.s` — Parser Extension
+
+**A. New strings in `BT_RODATA`** (`CAM_` prefix prevents collision with `DIR=LEFT/RIGHT`):
+
+```assembly
+BT_TEXT_CMD_UI          DCB "CMD=UI",0
+BT_TEXT_KEY_PREFIX      DCB "KEY=",0
+BT_TEXT_KEY_UP          DCB "KEY=CAM_UP",0
+BT_TEXT_KEY_DOWN        DCB "KEY=CAM_DOWN",0
+BT_TEXT_KEY_LEFT        DCB "KEY=CAM_LEFT",0
+BT_TEXT_KEY_RIGHT       DCB "KEY=CAM_RIGHT",0
+BT_TEXT_KEY_0           DCB "KEY=0",0
+; ... KEY=1 through KEY=9, KEY=A through KEY=D
+```
+
+**B. `BT_ParseLine` — New check (inserted after `MODE=LINE`, before `OFF`):**
+
+```assembly
+; 8. Check for CMD=UI,KEY=... (virtual keypad injection)
+        LDR     R0, =bt_rx_buffer
+        LDR     R1, =BT_TEXT_CMD_UI
+        BL      BT_Contains
+        CMP     R0, #1
+        BEQ     BTP_UIKey
+
+BTP_UIKey
+        BL      BT_Handle_UIKey
+        BL      BT_QueueACK
+        B       BTP_Exit
+```
+
+**C. `BT_Handle_UIKey` subroutine** (place at the bottom of `bluetooth.s`, above `END`):
+
+Checks multi-char keys first (`CAM_UP/DOWN/LEFT/RIGHT`), then single-char keys (`0–9`, `A–D`). Uses `BEQ.W` (forced 32-bit branch encoding) to prevent assembler out-of-range errors. Stores the matched `KEY_x` constant into `g_bt_ui_key_request`.
+
+```assembly
+BT_Handle_UIKey
+        PUSH    {R4-R7, LR}
+        ; Check CAM_UP first (multi-char, must precede single-char "U" check)
+        LDR     R0, =bt_rx_buffer
+        LDR     R1, =BT_TEXT_KEY_UP
+        BL      BT_Contains
+        CMP     R0, #1
+        BEQ.W   BTUI_Up
+        ; ... repeat for DOWN, LEFT, RIGHT, then 0-9, A-D
+BTUI_Up
+        MOVS    R4, #KEY_UP
+        B       BTUI_Store
+        ; ... other labels
+BTUI_Store
+        LDR     R5, =g_bt_ui_key_request
+        STR     R4, [R5]
+BTUI_Exit
+        POP     {R4-R7, PC}
+        ALIGN
+        LTORG
+```
+
+#### 3. `main.s` — Key Injection into the Super Loop
+
+```assembly
+; Import the shared variable:
+IMPORT  g_bt_ui_key_request
+
+; Updated Main_Loop (add after BT_RxTask):
+Main_Loop
+        BL      BT_RxTask                       ; Pull Bluetooth bytes
+        BL      Main_ProcessBTKeyInjection       ; ← Inject virtual keypad presses
+        BL      Main_ProcessBluetoothCmd         ; Act on motion commands
+        BL      Main_CheckIRInput                ; IR remote
+        ; ... rest unchanged
+
+; Injection subroutine (place below Main_BackgroundTasks):
+Main_ProcessBTKeyInjection
+        PUSH    {R4-R6, LR}
+        LDR     R4, =g_bt_ui_key_request
+        LDR     R5, [R4]
+        CMP     R5, #0
+        BEQ     MPBK_Exit                ; No pending key — skip
+        LDR     R6, =g_keycode
+        STR     R5, [R6]                 ; Inject into g_keycode (same as IR remote)
+        MOVS    R5, #0
+        STR     R5, [R4]                 ; Clear the request
+MPBK_Exit
+        POP     {R4-R6, PC}
+```
+
+> **Design note:** Writing into `g_keycode` means the virtual keypad press flows through exactly the same `UI_Handle_Input` dispatch path as a physical IR remote press — no duplicate state-machine logic required anywhere.
+
+---
+
 
 ## 🙏 Acknowledgements
 
