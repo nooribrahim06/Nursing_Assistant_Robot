@@ -378,8 +378,9 @@ BPL     Stress_Pos          ; If result is positive, branch to multiply
 MOVS    R2, #0              ; Clamp negative values to 0
 Stress_Pos
 LSLS    R2, R2, #1          ; Logical Shift Left by 1 (Fast multiply by 2)
-```
-ذذذذ
+``` 
+---
+
 ## 🌬️ Breathing Monitor
 
 **Files:** `breathing.s`, `adc.s`
