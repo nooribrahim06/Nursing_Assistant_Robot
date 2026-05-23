@@ -1,5 +1,5 @@
 ; =====================================================================
-; FILE: motion.s (Touched)
+; FILE: motion.s
 ; DESCRIPTION:
 ;   Default motion flow + temporary PHONE override for Bluetooth app
 ;
@@ -178,7 +178,7 @@ MOT_CheckStation
         LDR     R0, [R0]
         CMP     R0, #0
         BEQ     MOT_ModeDispatch
-        BL      MOT_StopNow         ; Station detected -> full stop
+        BL      MOT_StopNow         ; Station detected -> PB13 Outputs High -> full stop
         B       MOT_Update_Exit
 
 MOT_ModeDispatch
@@ -222,33 +222,32 @@ MOT_DefaultFlow
         ; 4. Combine sensor mask
         ORR     R7, R4, R5
         ORR     R7, R7, R6
-        EOR     R7, R7, #7              ; Invert 3-bit mask (0 becomes 1, 1 becomes 0)
-
+        EOR     R7, R7, #7              ;Note: Assuming your line tracker already outputs Low if it detects the black line then you will simply use an ORR instruction
         ; -------------------------------------------------------------
         ; Existing decision tree
         ; -------------------------------------------------------------
-        CMP     R7, #0x02               ; Center only
+        CMP     R7, #0x02               ; Center only (010)
         BEQ     Action_Straight
 
-        CMP     R7, #0x05               ; Left + Right
+        CMP     R7, #0x05               ; Left + Right (101)
         BEQ     Action_Straight
 
-        CMP     R7, #0x04               ; Left only
+        CMP     R7, #0x04               ; Left only (100)
         BEQ     Action_Arc_Left
 
-        CMP     R7, #0x06               ; Left + Center
+        CMP     R7, #0x06               ; Left + Center (110)
         BEQ     Action_Arc_Left
 
-        CMP     R7, #0x01               ; Right only
+        CMP     R7, #0x01               ; Right only (001)
         BEQ     Action_Arc_Right
 
-        CMP     R7, #0x03               ; Right + Center
+        CMP     R7, #0x03               ; Right + Center (011)
         BEQ     Action_Arc_Right
 
-        CMP     R7, #0x07               ; 3 Ones (Black Bar)
+        CMP     R7, #0x07               ; 3 Ones (Black Bar) -> Stop at the intersection
         BEQ     Action_Search
 
-        CMP     R7, #0x00               ; 3 Zeros (Lost Line)
+        CMP     R7, #0x00               ; 3 Zeros (Lost Line) -> Jump to Line Saver
         BEQ     Rescue_Lost_Line
 
         B       Action_Search
@@ -261,13 +260,13 @@ Rescue_Lost_Line
         LDR     R2, =Last_Turn
         LDR     R3, [R2]
 
-        CMP     R3, #1
+        CMP     R3, #1    ; If the Last Thing before the Sensor read before Losing the Line was go Left
         BEQ     Action_Pivot_Left
 
-        CMP     R3, #2
+        CMP     R3, #2    ; If the Last Thing before the Sensor read before Losing the Line was go Right
         BEQ     Action_Pivot_Right
 
-        B       Action_Straight
+        B       Action_Straight  ;If Not Left nor Right, then go straight ahead
 
 
 ; =====================================================================
