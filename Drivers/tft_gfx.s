@@ -35,6 +35,12 @@
         
         EXPORT  TFT_Render_Vision
         EXPORT  TFT_Render_Vision_Res
+        
+        EXPORT  TFT_Render_Vein
+        EXPORT  TFT_Update_Vein_Wave
+        EXPORT  TFT_Render_Stress
+        EXPORT  TFT_Update_Stress_Values
+        EXPORT  TFT_Render_More_Menu
 
         EXPORT  TFT_Draw_Pixel
         EXPORT  TFT_Draw_Rect
@@ -56,6 +62,11 @@
         IMPORT  g_vision_level_score
         IMPORT  g_vision_results
         IMPORT  g_vision_dirs
+        
+        IMPORT  g_vein_diff
+        IMPORT  g_vein_plot_x
+        IMPORT  g_vein_calib_cnt
+        IMPORT  g_stress_score
 
         IMPORT  TFT_SetAddressWindow
         IMPORT  TFT_WriteData16
@@ -140,7 +151,6 @@ g_breath_plot_x         SPACE   4
 g_breath_draw_tick      SPACE   4
 g_ppg_plot_x            SPACE   4
 
-; NEW (REQUIRED FOR REAL PPG)
 g_ppg_last_y            SPACE   4
 g_ppg_smooth            SPACE   4
 g_ppg_min               SPACE   4
@@ -1173,7 +1183,6 @@ Num6_L5_Done
 ; Fast integer-based horizontal line fill for circles
 ;-----------------------------------------------------------------------------
 TFT_Fill_Circle
-        ; R0 = Xc, R1 = Yc, R2 = R, R3 = Color
         PUSH    {R4-R11, LR}
         MOV     R6, R0          ; Xc
         MOV     R7, R1          ; Yc
@@ -1183,7 +1192,6 @@ TFT_Fill_Circle
         CMP     R8, #0
         BLE     FillCirc_Done
 
-        ; R10 = Y = -R
         RSB     R10, R8, #0
 FillCirc_Y_Loop
         CMP     R10, R8
@@ -1191,7 +1199,6 @@ FillCirc_Y_Loop
 
         MOVS    R11, #0         ; X = 0
 FillCirc_X_Search
-        ; if (X*X + Y*Y > R*R) break
         MUL     R4, R11, R11
         MUL     R5, R10, R10
         ADD     R4, R4, R5
@@ -1205,16 +1212,15 @@ FillCirc_X_Search
 FillCirc_DrawLine
         SUBS    R11, R11, #1    ; X_max
 
-        ; Draw horizontal line: TFT_Fill_Rect(Xc - X_max, Yc + Y, 2*X_max + 1, 1, color)
         MOV     R0, R6
-        SUB     R0, R0, R11     ; X_start = Xc - X_max
+        SUB     R0, R0, R11     
         MOV     R1, R7
-        ADD     R1, R1, R10     ; Y_line = Yc + Y
+        ADD     R1, R1, R10     
         MOV     R2, R11
         LSLS    R2, R2, #1
-        ADDS    R2, R2, #1      ; Width = 2*X_max + 1
-        MOVS    R3, #1          ; Height = 1
-        MOV     R4, R9          ; color
+        ADDS    R2, R2, #1      
+        MOVS    R3, #1          
+        MOV     R4, R9          
         BL      TFT_Fill_Rect
 
         ADDS    R10, R10, #1
@@ -1230,44 +1236,37 @@ FillCirc_Done
 TFT_Draw_Circle_C
         PUSH    {R4-R11, LR}
         
-        MOV     R6, R0          ; X
-        MOV     R7, R1          ; Y
-        MOV     R8, R2          ; Size
-        MOV     R9, R3          ; Dir
+        MOV     R6, R0          
+        MOV     R7, R1          
+        MOV     R8, R2          
+        MOV     R9, R3          
         
-        ; Calculate thickness (Size / 5)
         MOVS    R1, #5
-        UDIV    R10, R8, R1     ; R10 = thick
+        UDIV    R10, R8, R1     
 
-        ; R_outer = Size / 2
         MOV     R11, R8
-        LSRS    R11, R11, #1    ; R11 = R_outer
+        LSRS    R11, R11, #1    
 
-        ; Xc = X + R_outer
         MOV     R4, R6
         ADD     R4, R4, R11
-        ; Yc = Y + R_outer
         MOV     R5, R7
         ADD     R5, R5, R11
 
-        ; 1. Draw Outer Circle (Colored: White, Green, or Red)
         MOVW    R0, #:LOWER16:g_vision_color
         MOVT    R0, #:UPPER16:g_vision_color
-        LDR     R3, [R0]        ; R3 = Color
-        MOV     R0, R4          ; Xc
-        MOV     R1, R5          ; Yc
-        MOV     R2, R11         ; R_outer
+        LDR     R3, [R0]        
+        MOV     R0, R4          
+        MOV     R1, R5          
+        MOV     R2, R11         
         BL      TFT_Fill_Circle
 
-        ; 2. Draw Inner Circle (Black background inside the ring)
         MOV     R0, R4
         MOV     R1, R5
         MOV     R2, R11
-        SUB     R2, R2, R10     ; R_inner = R_outer - thick
+        SUB     R2, R2, R10     
         MOVW    R3, #COLOR_BLACK
         BL      TFT_Fill_Circle
 
-        ; 3. Draw Gap (Black Rectangle breaking the ring)
         CMP     R9, #0
         BEQ     Gap_Up_Circ
         CMP     R9, #1
@@ -1279,25 +1278,25 @@ TFT_Draw_Circle_C
         B       Draw_C_Done_Circ
 
 Gap_Up_Circ
-        MOV     R0, R4          ; Xc
+        MOV     R0, R4          
         MOV     R2, R10
         LSRS    R2, R2, #1
-        SUB     R0, R0, R2      ; X = Xc - (thick/2)
-        MOV     R1, R7          ; Y = Y_top
-        MOV     R2, R10         ; W = thick
-        MOV     R3, R11         ; H = R_outer
+        SUB     R0, R0, R2      
+        MOV     R1, R7          
+        MOV     R2, R10         
+        MOV     R3, R11         
         MOVW    R4, #COLOR_BLACK
         BL      TFT_Fill_Rect
         B       Draw_C_Done_Circ
 
 Gap_Right_Circ
-        MOV     R0, R4          ; X = Xc
-        MOV     R1, R5          ; Yc
+        MOV     R0, R4          
+        MOV     R1, R5          
         MOV     R2, R10
         LSRS    R2, R2, #1
-        SUB     R1, R1, R2      ; Y = Yc - (thick/2)
-        MOV     R2, R11         ; W = R_outer
-        MOV     R3, R10         ; H = thick
+        SUB     R1, R1, R2      
+        MOV     R2, R11         
+        MOV     R3, R10         
         MOVW    R4, #COLOR_BLACK
         BL      TFT_Fill_Rect
         B       Draw_C_Done_Circ
@@ -1306,22 +1305,22 @@ Gap_Down_Circ
         MOV     R0, R4
         MOV     R2, R10
         LSRS    R2, R2, #1
-        SUB     R0, R0, R2      ; X = Xc - (thick/2)
-        MOV     R1, R5          ; Y = Yc
-        MOV     R2, R10         ; W = thick
-        MOV     R3, R11         ; H = R_outer
+        SUB     R0, R0, R2      
+        MOV     R1, R5          
+        MOV     R2, R10         
+        MOV     R3, R11         
         MOVW    R4, #COLOR_BLACK
         BL      TFT_Fill_Rect
         B       Draw_C_Done_Circ
 
 Gap_Left_Circ
-        MOV     R0, R6          ; X = X_left
+        MOV     R0, R6          
         MOV     R1, R5
         MOV     R2, R10
         LSRS    R2, R2, #1
-        SUB     R1, R1, R2      ; Y = Yc - (thick/2)
-        MOV     R2, R11         ; W = R_outer
-        MOV     R3, R10         ; H = thick
+        SUB     R1, R1, R2      
+        MOV     R2, R11         
+        MOV     R3, R10         
         MOVW    R4, #COLOR_BLACK
         BL      TFT_Fill_Rect
 
@@ -1496,14 +1495,12 @@ TFT_Render_Heart_Rate
         BL      TFT_Draw_Robo_Frame_Normal
         BL      TFT_Draw_Robo_Face_Happy
 
-        ; left values panel
         MOVS    R0, #16
         MOVS    R1, #56
         MOVS    R2, #178
         MOVS    R3, #128
         BL      TFT_Draw_Panel
 
-        ; right icon / PPG panel
         MOVS    R0, #206
         MOVS    R1, #56
         MOVS    R2, #98
@@ -1534,7 +1531,6 @@ TFT_Render_Heart_Rate
 
         BL      TFT_Update_Heart_Values
 
-        ; fixed PPG button placement: inside the right heart panel, below icon
         MOVS    R0, #224
         MOVS    R1, #162
         MOVW    R2, #:LOWER16:StrHeartPPGKey
@@ -1542,7 +1538,6 @@ TFT_Render_Heart_Rate
         MOVW    R3, #COLOR_CYAN
         BL      TFT_Draw_String
 
-        ; exit hint at bottom, not overlapping PPG button
         MOVS    R0, #112
         MOVS    R1, #206
         MOVW    R2, #:LOWER16:StrExitD
@@ -1551,9 +1546,6 @@ TFT_Render_Heart_Rate
         BL      TFT_Draw_String2x
 
         POP     {R4, PC}
-
-
-
 
 TFT_Render_Temp
         PUSH    {R4, LR}
@@ -1662,8 +1654,6 @@ TFT_Render_Breathing
         STR     R1, [R0]
 
         POP     {R4, PC}
-
-
 
 TFT_Render_Motion
         PUSH    {R4, LR}
@@ -2028,7 +2018,7 @@ TFT_Render_Smoke_ALERT
         POP     {R4, PC}
 
 ;-----------------------------------------------------------------------------
-; Vision Test - 3 Rings Left to Right rendering (UPDATED)
+; Vision Test - 3 Rings Left to Right rendering
 ;-----------------------------------------------------------------------------
 TFT_Render_Vision
         PUSH    {R4-R11, LR}
@@ -2050,7 +2040,6 @@ TFT_Render_Vision
         MOVW    R3, #COLOR_WHITE
         BL      TFT_Draw_String2x
 
-        ; Get size based on Level (0-4)
         MOVW    R0, #:LOWER16:g_vision_level
         MOVT    R0, #:UPPER16:g_vision_level
         LDR     R6, [R0]
@@ -2078,17 +2067,16 @@ Vis_Sz4
         MOVS    R10, #14        ; Lvl 4: 6/6
 Vis_SzDone
 
-        MOVS    R11, #0         ; loop counter 'i'
+        MOVS    R11, #0         
 Vis_Loop
         MOVW    R0, #:LOWER16:g_vision_ring_idx
         MOVT    R0, #:UPPER16:g_vision_ring_idx
         LDR     R7, [R0]
         CMP     R11, R7
-        BHI     Vis_Render_Exit ; Break if i > current ring index
+        BHI     Vis_Render_Exit 
 
-        ; Set Color
         CMP     R11, R7
-        BEQ     Vis_ColorWhite  ; Active ring is white
+        BEQ     Vis_ColorWhite  
         
         MOVW    R0, #:LOWER16:g_vision_results
         MOVT    R0, #:UPPER16:g_vision_results
@@ -2108,33 +2096,31 @@ Vis_SetColor
         MOVT    R0, #:UPPER16:g_vision_color
         STR     R4, [R0]
 
-        ; Set X position (Right to Left)
         CMP     R11, #0
         BNE     Vis_X1
-        MOVS    R0, #250        ; Right
+        MOVS    R0, #250        
         B       Vis_XDone
 Vis_X1
         CMP     R11, #1
         BNE     Vis_X2
-        MOVS    R0, #160        ; Center
+        MOVS    R0, #160        
         B       Vis_XDone
 Vis_X2
-        MOVS    R0, #70         ; Left
+        MOVS    R0, #70         
 Vis_XDone
 
-        ; Calc Center Coordinates
         MOV     R4, R10
         LSRS    R4, R4, #1      
-        SUB     R0, R0, R4      ; Xc = X - (size/2)
-        MOVS    R1, #120        ; Y base height
-        SUB     R1, R1, R4      ; Yc = Y - (size/2)
+        SUB     R0, R0, R4      
+        MOVS    R1, #120        
+        SUB     R1, R1, R4      
 
-        MOV     R2, R10         ; Size parameter
+        MOV     R2, R10         
         
         MOVW    R3, #:LOWER16:g_vision_dirs
         MOVT    R3, #:UPPER16:g_vision_dirs
         LSLS    R4, R11, #2
-        LDR     R3, [R3, R4]    ; Direction parameter
+        LDR     R3, [R3, R4]    
 
         BL      TFT_Draw_Circle_C
 
@@ -2146,7 +2132,7 @@ Vis_Render_Exit
 
 
 ;-----------------------------------------------------------------------------
-; Vision Results - Prints Snellen Values (UPDATED)
+; Vision Results 
 ;-----------------------------------------------------------------------------
 TFT_Render_Vision_Res
         PUSH    {R4-R8, LR}
@@ -2161,7 +2147,6 @@ TFT_Render_Vision_Res
         MOVW    R3, #COLOR_BLACK
         BL      TFT_Draw_String2x
 
-        ; Print Prefix string
         MOVS    R0, #60
         MOVS    R1, #100
         MOVW    R2, #:LOWER16:StrSnellenPrefix
@@ -2169,7 +2154,6 @@ TFT_Render_Vision_Res
         MOVW    R3, #COLOR_WHITE
         BL      TFT_Draw_String2x
 
-        ; Retrieve Snellen level
         MOVW    R0, #:LOWER16:g_vision_level
         MOVT    R0, #:UPPER16:g_vision_level
         LDR     R6, [R0]
@@ -2213,7 +2197,6 @@ Res_DrawStr
         MOVW    R3, #COLOR_GREEN
         BL      TFT_Draw_String2x
 
-        ; Draw exit hint
         MOVS    R0, #110
         MOVS    R1, #200
         MOVW    R2, #:LOWER16:StrExitD
@@ -2276,6 +2259,8 @@ Smoke_Draw_Animation
         LDR     R0, [R0]
         CMP     R0, #STATE_MAIN_MENU
         BEQ     Smoke_Update_Menu
+        CMP     R0, #STATE_MORE_MENU
+        BEQ     Smoke_Update_Menu
         B       Smoke_Done
 
 Smoke_Update_Menu
@@ -2284,13 +2269,10 @@ Smoke_Update_Menu
 Smoke_Done
         POP     {R4-R7, PC}
 
-;-----------------------------------------------------------------------------
-; Partial update functions
-;-----------------------------------------------------------------------------
+
 TFT_Update_Temp_Values
         PUSH    {R4-R7, LR}
 
-        ; clear old number/status area
         MOVW    R4, #COLOR_BLACK
         MOVW    R0, #150
         MOVW    R1, #94
@@ -2298,7 +2280,6 @@ TFT_Update_Temp_Values
         MOVS    R3, #34
         BL      TFT_Fill_Rect
 
-        ; Load MAX30102 die temperature integer
         MOVW    R0, #:LOWER16:g_temp_int
         MOVT    R0, #:UPPER16:g_temp_int
         LDR     R2, [R0]
@@ -2306,31 +2287,22 @@ TFT_Update_Temp_Values
         CMP     R2, #0
         BEQ     Temp_Show_Wait
 
-        ; Load IR raw for finger detection
         MOVW    R0, #:LOWER16:g_hr_ir_raw
         MOVT    R0, #:UPPER16:g_hr_ir_raw
         LDR     R1, [R0]
 
-        ; FIX: old code added +5/+6/+7 based on finger strength.
-        ; That made temperature climb to 39 while finger stayed on sensor.
-        ; New behavior:
-        ;   no finger -> display real chip temp
-        ;   finger    -> stable demo body-like 36.x, clamped
         MOVW    R0, #40000
         CMP     R1, R0
         BLO     Temp_Draw
 
-        ; finger present: stable normal demo value = 36.x
         MOVS    R2, #36
 
 Temp_Draw
-        ; Draw integer part
         MOVW    R3, #COLOR_WHITE
         MOVW    R0, #180
         MOVW    R1, #100
         BL      TFT_Draw_Number3_2x
 
-        ; decimal point
         MOVW    R4, #COLOR_WHITE
         MOVW    R0, #222
         MOVW    R1, #112
@@ -2338,7 +2310,6 @@ Temp_Draw
         MOVS    R3, #4
         BL      TFT_Fill_Rect
 
-        ; fractional part: frac * 10 / 16
         MOVW    R0, #:LOWER16:g_temp_frac
         MOVT    R0, #:UPPER16:g_temp_frac
         LDR     R2, [R0]
@@ -2347,7 +2318,6 @@ Temp_Draw
         MUL     R2, R2, R5
         LSRS    R2, R2, #4
 
-        ; if finger present, clamp fraction to 0..7 => never displays 39
         MOVW    R0, #:LOWER16:g_hr_ir_raw
         MOVT    R0, #:UPPER16:g_hr_ir_raw
         LDR     R1, [R0]
@@ -2367,7 +2337,6 @@ Temp_Frac_ToAscii
         MOVW    R3, #COLOR_WHITE
         BL      GFX_Draw_Char2x
 
-        ; C
         MOVW    R0, #252
         MOVW    R1, #100
         MOVS    R2, #'C'
@@ -2388,25 +2357,9 @@ Temp_Update_Exit
         POP     {R4-R7, PC}
 
 
-;-----------------------------------------------------------------------------
-; TFT_Update_PPG_Wave
-;-----------------------------------------------------------------------------
-; TFT_Update_PPG_Wave
-;
-; REAL PPG MODE:
-; - Uses actual MAX30102 IR raw value from g_hr_ir_raw
-; - Smooths signal
-; - Auto-scales using live min/max
-; - Draws connected scrolling waveform
-;
-; If no finger is detected, it draws a flat baseline.
-;-----------------------------------------------------------------------------
 TFT_Update_PPG_Wave
         PUSH    {R4-R11, LR}
 
-        ; -------------------------------------------------------------
-        ; Load current X
-        ; -------------------------------------------------------------
         MOVW    R0, #:LOWER16:g_ppg_plot_x
         MOVT    R0, #:UPPER16:g_ppg_plot_x
         LDR     R5, [R0]
@@ -2415,7 +2368,6 @@ TFT_Update_PPG_Wave
         CMP     R5, R0
         BLO     PPG_Real_X_OK
 
-        ; wrap and clear plot area
         MOVS    R5, #0
 
         MOVW    R4, #COLOR_BLACK
@@ -2432,7 +2384,6 @@ TFT_Update_PPG_Wave
         MOVS    R3, #1
         BL      TFT_Fill_Rect
 
-        ; reset auto-scale on wrap
         MOVS    R1, #0
         MOVW    R0, #:LOWER16:g_ppg_last_y
         MOVT    R0, #:UPPER16:g_ppg_last_y
@@ -2453,9 +2404,6 @@ TFT_Update_PPG_Wave
         STR     R1, [R0]
 
 PPG_Real_X_OK
-        ; -------------------------------------------------------------
-        ; Erase current 2-pixel vertical strip
-        ; -------------------------------------------------------------
         MOVW    R4, #COLOR_BLACK
         MOVS    R0, #PPG_PLOT_X
         ADD     R0, R0, R5
@@ -2464,7 +2412,6 @@ PPG_Real_X_OK
         MOVS    R3, #PPG_PLOT_H
         BL      TFT_Fill_Rect
 
-        ; redraw baseline in strip
         MOVW    R4, #COLOR_GRAY
         MOVS    R0, #PPG_PLOT_X
         ADD     R0, R0, R5
@@ -2473,30 +2420,21 @@ PPG_Real_X_OK
         MOVS    R3, #1
         BL      TFT_Fill_Rect
 
-        ; -------------------------------------------------------------
-        ; Load real IR raw sample
-        ; -------------------------------------------------------------
         MOVW    R0, #:LOWER16:g_hr_ir_raw
         MOVT    R0, #:UPPER16:g_hr_ir_raw
-        LDR     R7, [R0]                 ; R7 = raw IR
+        LDR     R7, [R0]                 
 
-        ; no finger threshold
         MOVW    R0, #40000
         CMP     R7, R0
         BLO     PPG_NoFinger
 
-        ; -------------------------------------------------------------
-        ; Smooth:
-        ; smooth = smooth + (raw - smooth) / 8
-        ; -------------------------------------------------------------
         MOVW    R0, #:LOWER16:g_ppg_smooth
         MOVT    R0, #:UPPER16:g_ppg_smooth
-        LDR     R6, [R0]                 ; R6 = smooth
+        LDR     R6, [R0]                 
 
         CMP     R6, #0
         BNE     PPG_Smooth_HasOld
 
-        ; first sample
         MOV     R6, R7
         STR     R6, [R0]
         B       PPG_Smooth_Done
@@ -2505,7 +2443,6 @@ PPG_Smooth_HasOld
         CMP     R7, R6
         BHS     PPG_Smooth_RawHigher
 
-        ; raw < smooth
         SUB     R8, R6, R7
         LSRS    R8, R8, #3
         SUB     R6, R6, R8
@@ -2519,9 +2456,6 @@ PPG_Smooth_RawHigher
         STR     R6, [R0]
 
 PPG_Smooth_Done
-        ; -------------------------------------------------------------
-        ; Update live min/max using smoothed sample
-        ; -------------------------------------------------------------
         MOVW    R0, #:LOWER16:g_ppg_min
         MOVT    R0, #:UPPER16:g_ppg_min
         LDR     R8, [R0]
@@ -2540,49 +2474,37 @@ PPG_Min_OK
         MOV     R9, R6
 
 PPG_Max_OK
-        ; range = max - min
         SUB     R10, R9, R8
 
-        ; avoid division by tiny range
         MOVW    R0, #3000
         CMP     R10, R0
         BHS     PPG_Range_OK
         MOV     R10, R0
 
 PPG_Range_OK
-        ; delta = smooth - min
         SUB     R11, R6, R8
 
-        ; scaled = delta * 80 / range
         MOVS    R0, #80
         MUL     R11, R11, R0
         UDIV    R11, R11, R10
 
-        ; y = 158 - scaled
         MOVS    R1, #158
         SUB     R1, R1, R11
 
-        ; clamp top to 74
         CMP     R1, #74
         BHS     PPG_Y_Top_OK
         MOVS    R1, #74
 
 PPG_Y_Top_OK
-        ; clamp bottom to 158
         CMP     R1, #158
         BLS     PPG_Draw_Real
         MOVS    R1, #158
 
         B       PPG_Draw_Real
 
-; -------------------------------------------------------------
-; No finger: draw flat baseline and reset scaling gradually
-; -------------------------------------------------------------
 PPG_NoFinger
-        ; y = baseline
         MOVS    R1, #PPG_BASE_Y
 
-        ; reset smoothing/min/max so when finger returns scaling restarts clean
         MOVS    R0, #0
         MOVW    R2, #:LOWER16:g_ppg_smooth
         MOVT    R2, #:UPPER16:g_ppg_smooth
@@ -2598,20 +2520,12 @@ PPG_NoFinger
         MOVT    R2, #:UPPER16:g_ppg_min
         STR     R0, [R2]
 
-; -------------------------------------------------------------
-; Draw connected waveform from last_y to current y
-; IN:
-;   R1 = current y
-;   R5 = plot x
-; -------------------------------------------------------------
 PPG_Draw_Real
-        MOV     R11, R1                 ; save current y
+        MOV     R11, R1                 
 
-        ; x_abs = PPG_PLOT_X + x
         MOVS    R8, #PPG_PLOT_X
         ADD     R8, R8, R5
 
-        ; load last_y
         MOVW    R0, #:LOWER16:g_ppg_last_y
         MOVT    R0, #:UPPER16:g_ppg_last_y
         LDR     R6, [R0]
@@ -2619,32 +2533,27 @@ PPG_Draw_Real
         CMP     R6, #0
         BNE     PPG_Has_LastY
 
-        ; first point: last_y = current y
         STR     R11, [R0]
         MOV     R6, R11
 
 PPG_Has_LastY
-        ; choose start/end y
         CMP     R6, R11
         BLS     PPG_Last_Lower
 
-        ; last_y > current_y
-        MOV     R9, R11                 ; start = current
-        MOV     R10, R6                 ; end = last
+        MOV     R9, R11                 
+        MOV     R10, R6                 
         B       PPG_Line_Loop
 
 PPG_Last_Lower
-        MOV     R9, R6                  ; start = last
-        MOV     R10, R11                ; end = current
+        MOV     R9, R6                  
+        MOV     R10, R11                
 
 PPG_Line_Loop
-        ; draw pixel at x
         MOV     R0, R8
         MOV     R1, R9
         MOVW    R2, #COLOR_GREEN
         BL      TFT_Draw_Pixel
 
-        ; draw pixel at x+1 for thickness
         ADD     R0, R8, #1
         MOV     R1, R9
         MOVW    R2, #COLOR_GREEN
@@ -2657,22 +2566,21 @@ PPG_Line_Loop
         B       PPG_Line_Loop
 
 PPG_Line_Done
-        ; store last_y = current_y
         MOVW    R0, #:LOWER16:g_ppg_last_y
         MOVT    R0, #:UPPER16:g_ppg_last_y
         STR     R11, [R0]
 
-        ; x += 2
         ADDS    R5, R5, #2
         MOVW    R0, #:LOWER16:g_ppg_plot_x
         MOVT    R0, #:UPPER16:g_ppg_plot_x
         STR     R5, [R0]
 
         POP     {R4-R11, PC}
+
+
 TFT_Render_PPG_Wave
         PUSH    {R4, LR}
 
-        ; Full styled PPG screen, same UI family as other TFT_GFX pages
         MOVW    R4, #COLOR_DARKRED
         BL      TFT_Draw_HeaderBand
 
@@ -2686,14 +2594,12 @@ TFT_Render_PPG_Wave
         BL      TFT_Draw_Robo_Frame_Normal
         BL      TFT_Draw_Robo_Face_Happy
 
-        ; graph panel frame
         MOVS    R0, #PPG_BOX_X
         MOVS    R1, #PPG_BOX_Y
         MOVW    R2, #PPG_BOX_W
         MOVS    R3, #PPG_BOX_H
         BL      TFT_Draw_Panel
 
-        ; black graph area
         MOVW    R4, #COLOR_BLACK
         MOVS    R0, #PPG_PLOT_X
         MOVS    R1, #PPG_PLOT_Y
@@ -2701,7 +2607,6 @@ TFT_Render_PPG_Wave
         MOVS    R3, #PPG_PLOT_H
         BL      TFT_Fill_Rect
 
-        ; midline
         MOVW    R4, #COLOR_GRAY
         MOVS    R0, #PPG_PLOT_X
         MOVS    R1, #PPG_BASE_Y
@@ -2709,7 +2614,6 @@ TFT_Render_PPG_Wave
         MOVS    R3, #1
         BL      TFT_Fill_Rect
 
-        ; small label + exit
         MOVS    R0, #20
         MOVS    R1, #190
         MOVW    R2, #:LOWER16:StrPPGInfo
@@ -2724,7 +2628,6 @@ TFT_Render_PPG_Wave
         MOVW    R3, #COLOR_WHITE
         BL      TFT_Draw_String2x
 
-        ; reset scrolling and scaling state
         MOVS    R1, #0
         MOVW    R0, #:LOWER16:g_ppg_plot_x
         MOVT    R0, #:UPPER16:g_ppg_plot_x
@@ -2862,6 +2765,140 @@ Breath_Clamp_OK
 
 
 ;-----------------------------------------------------------------------------
+; Vein Finder Rendering & Wave
+;-----------------------------------------------------------------------------
+TFT_Render_Vein
+        PUSH    {R4, LR}
+
+        MOVW    R4, #COLOR_MAGENTA
+        BL      TFT_Draw_HeaderBand
+
+        MOVS    R0, #16
+        MOVS    R1, #8
+        MOVW    R2, #:LOWER16:StrVeinHeader
+        MOVT    R2, #:UPPER16:StrVeinHeader
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        BL      TFT_Draw_Robo_Frame_Normal
+        BL      TFT_Draw_Robo_Face_Open
+
+        MOVS    R0, #PPG_BOX_X
+        MOVS    R1, #PPG_BOX_Y
+        MOVW    R2, #PPG_BOX_W
+        MOVS    R3, #PPG_BOX_H
+        BL      TFT_Draw_Panel
+
+        MOVW    R4, #COLOR_BLACK
+        MOVS    R0, #PPG_PLOT_X
+        MOVS    R1, #PPG_PLOT_Y
+        MOVW    R2, #PPG_PLOT_W
+        MOVS    R3, #PPG_PLOT_H
+        BL      TFT_Fill_Rect
+
+        MOVS    R0, #20
+        MOVS    R1, #190
+        MOVW    R2, #:LOWER16:StrVeinInfo
+        MOVT    R2, #:UPPER16:StrVeinInfo
+        MOVW    R3, #COLOR_CYAN
+        BL      TFT_Draw_String2x
+
+        MOVS    R0, #206
+        MOVS    R1, #190
+        MOVW    R2, #:LOWER16:StrExitD
+        MOVT    R2, #:UPPER16:StrExitD
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        MOVS    R1, #0
+        MOVW    R0, #:LOWER16:g_vein_plot_x
+        MOVT    R0, #:UPPER16:g_vein_plot_x
+        STR     R1, [R0]
+
+        POP     {R4, PC}
+
+TFT_Update_Vein_Wave
+        PUSH    {R4-R8, LR}
+
+        MOVW    R0, #:LOWER16:g_vein_calib_cnt
+        MOVT    R0, #:UPPER16:g_vein_calib_cnt
+        LDR     R1, [R0]
+        CMP     R1, #128             ; must complete full 128-sample calibration
+        BLO     VeinWave_Exit
+
+        MOVW    R0, #:LOWER16:g_vein_plot_x
+        MOVT    R0, #:UPPER16:g_vein_plot_x
+        LDR     R5, [R0]
+
+        MOVW    R0, #PPG_PLOT_W_LAST
+        CMP     R5, R0
+        BLO     VeinWave_X_OK
+
+        MOVS    R5, #0
+        MOVW    R4, #COLOR_BLACK
+        MOVS    R0, #PPG_PLOT_X
+        MOVS    R1, #PPG_PLOT_Y
+        MOVW    R2, #PPG_PLOT_W
+        MOVS    R3, #PPG_PLOT_H
+        BL      TFT_Fill_Rect
+
+VeinWave_X_OK
+        MOVW    R4, #COLOR_BLACK
+        MOVS    R0, #PPG_PLOT_X
+        ADD     R0, R0, R5
+        MOVS    R1, #PPG_PLOT_Y
+        MOVS    R2, #2
+        MOVS    R3, #PPG_PLOT_H
+        BL      TFT_Fill_Rect
+
+        MOVW    R0, #:LOWER16:g_vein_diff
+        MOVT    R0, #:UPPER16:g_vein_diff
+        LDR     R7, [R0]
+
+        LSRS    R7, R7, #4
+        CMP     R7, #94              ; tight clamp to keep wave inside panel
+        BLS     VeinWave_Clamp
+        MOVS    R7, #94
+VeinWave_Clamp
+
+        MOVS    R1, #158
+        SUB     R1, R1, R7
+
+        MOVS    R8, #PPG_PLOT_X
+        ADD     R8, R8, R5
+        MOV     R0, R8
+        MOVS    R2, #2
+        MOVS    R3, #2
+        MOVW    R4, #COLOR_GREEN
+        BL      TFT_Fill_Rect
+
+        ADDS    R5, R5, #2
+        MOVW    R0, #:LOWER16:g_vein_plot_x
+        MOVT    R0, #:UPPER16:g_vein_plot_x
+        STR     R5, [R0]
+
+        ; Clear and redraw the live diff number at the bottom
+        MOVW    R4, #COLOR_BLACK
+        MOVS    R0, #130
+        MOVS    R1, #190
+        MOVS    R2, #60
+        MOVS    R3, #16
+        BL      TFT_Fill_Rect
+
+        MOVW    R0, #:LOWER16:g_vein_diff
+        MOVT    R0, #:UPPER16:g_vein_diff
+        LDR     R2, [R0]
+
+        MOVS    R0, #130
+        MOVS    R1, #190
+        MOVW    R3, #COLOR_YELLOW
+        BL      TFT_Draw_Number6
+
+VeinWave_Exit
+        POP     {R4-R8, PC}
+
+
+;-----------------------------------------------------------------------------
 ; Strings
 ;-----------------------------------------------------------------------------
 StrMainMenu         DCB     "ROBO MENU",0
@@ -2870,7 +2907,13 @@ StrMenu2            DCB     "2 HEART",0
 StrMenu3            DCB     "3 BREATH",0
 StrMenu4            DCB     "4 MEDICINE",0
 StrMenu5            DCB     "5 TEMP",0
-StrMenu6            DCB     "6 VISION",0
+StrMenu6            DCB     "0 MORE",0
+StrMenu7            DCB     "7 VEIN FNDR",0
+StrMoreMenu         DCB     "MORE MENU",0
+StrMore1            DCB     "6 VISION",0
+StrMore2            DCB     "7 VEIN",0
+StrMore3            DCB     "8 STRESS",0
+StrMore4            DCB     "0 BACK",0
 StrSmoke            DCB     "SMOKE",0
 
 StrSanHeader        DCB     "SANITIZE",0
@@ -2904,7 +2947,6 @@ StrMedInput3        DCB     "C BACK",0
 StrTimerDbg         DCB     "TIMER",0
 StrMinLabel         DCB     "MIN:",0
 
-
 StrMedAlertHeader   DCB     "MED ALERT",0
 StrMedAlertBody     DCB     "TIME NOW",0
 StrMedAlertKeys     DCB     "A GO  C BACK",0
@@ -2921,6 +2963,16 @@ StrVisionHeader     DCB     "VISION TEST",0
 StrVisionBody       DCB     "USE ARROWS",0
 StrVisionRes        DCB     "RESULTS",0
 
+StrVeinHeader       DCB     "VEIN FINDER",0
+StrVeinInfo         DCB     "SEARCHING",0
+StrVeinCalib        DCB     "CALIBRATING",0
+
+StrStressHeader     DCB     "STRESS LEVEL",0
+StrStressLabel      DCB     "SCORE:",0
+StrStressPct        DCB     "%",0
+StrNormal           DCB     "NORMAL",0
+StrStressed         DCB     "STRESSED",0
+
 StrSnellenPrefix    DCB     "SNELLEN:",0
 StrSnellen0         DCB     "< 6/60",0
 StrSnellen1         DCB     "6/60",0
@@ -2931,6 +2983,199 @@ StrSnellen5         DCB     "6/6",0
 
         ALIGN
 
+
+;-----------------------------------------------------------------------------
+; More Menu (secondary page: Vision, Vein, Stress)
+;-----------------------------------------------------------------------------
+TFT_Render_More_Menu
+        PUSH    {R4, LR}
+
+        MOVW    R4, #COLOR_CYAN
+        BL      TFT_Draw_HeaderBand
+
+        MOVS    R0, #16
+        MOVS    R1, #8
+        MOVW    R2, #:LOWER16:StrMoreMenu
+        MOVT    R2, #:UPPER16:StrMoreMenu
+        MOVW    R3, #COLOR_BLACK
+        BL      TFT_Draw_String2x
+
+        BL      TFT_Draw_Robo_Frame_Normal
+        BL      TFT_Draw_Robo_MainMenuFace
+
+        ; Row 1 left  — Vision
+        MOVS    R0, #16
+        MOVS    R1, #52
+        MOVS    R2, #136
+        MOVS    R3, #36
+        BL      TFT_Draw_Panel
+
+        ; Row 1 right — Vein
+        MOVS    R0, #168
+        MOVS    R1, #52
+        MOVS    R2, #136
+        MOVS    R3, #36
+        BL      TFT_Draw_Panel
+
+        ; Row 2 left  — Stress
+        MOVS    R0, #16
+        MOVS    R1, #98
+        MOVS    R2, #136
+        MOVS    R3, #36
+        BL      TFT_Draw_Panel
+
+        ; Row 2 right — Back
+        MOVS    R0, #168
+        MOVS    R1, #98
+        MOVS    R2, #136
+        MOVS    R3, #36
+        BL      TFT_Draw_Panel
+
+        MOVS    R0, #22
+        MOVS    R1, #62
+        MOVW    R2, #:LOWER16:StrMore1
+        MOVT    R2, #:UPPER16:StrMore1
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        MOVS    R0, #174
+        MOVS    R1, #62
+        MOVW    R2, #:LOWER16:StrMore2
+        MOVT    R2, #:UPPER16:StrMore2
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        MOVS    R0, #22
+        MOVS    R1, #108
+        MOVW    R2, #:LOWER16:StrMore3
+        MOVT    R2, #:UPPER16:StrMore3
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        MOVS    R0, #174
+        MOVS    R1, #108
+        MOVW    R2, #:LOWER16:StrMore4
+        MOVT    R2, #:UPPER16:StrMore4
+        MOVW    R3, #COLOR_YELLOW
+        BL      TFT_Draw_String2x
+
+        BL      TFT_Draw_Smoke_Bar_Frame
+
+        POP     {R4, PC}
+
+;-----------------------------------------------------------------------------
+; Stress Level screen
+;-----------------------------------------------------------------------------
+TFT_Render_Stress
+        PUSH    {R4, LR}
+
+        MOVW    R4, #COLOR_ORANGE
+        BL      TFT_Draw_HeaderBand
+
+        MOVS    R0, #16
+        MOVS    R1, #8
+        MOVW    R2, #:LOWER16:StrStressHeader
+        MOVT    R2, #:UPPER16:StrStressHeader
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        BL      TFT_Draw_Robo_Frame_Normal
+        BL      TFT_Draw_Robo_Face_Happy
+
+        ; Panel — height 118 so exit button fits cleanly below it
+        MOVS    R0, #16
+        MOVS    R1, #56
+        MOVW    R2, #288
+        MOVS    R3, #118
+        BL      TFT_Draw_Panel
+
+        MOVS    R0, #30
+        MOVS    R1, #68
+        MOVW    R2, #:LOWER16:StrStressLabel
+        MOVT    R2, #:UPPER16:StrStressLabel
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        ; Exit button BELOW the panel (panel ends at y=174)
+        MOVS    R0, #110
+        MOVS    R1, #192
+        MOVW    R2, #:LOWER16:StrExitD
+        MOVT    R2, #:UPPER16:StrExitD
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        POP     {R4, PC}
+
+TFT_Update_Stress_Values
+        PUSH    {R4-R7, LR}
+
+        ; Clear entire number + status area inside panel
+        MOVW    R4, #COLOR_BLACK
+        MOVS    R0, #20
+        MOVS    R1, #90
+        MOVS    R2, #280
+        MOVS    R3, #75
+        BL      TFT_Fill_Rect
+
+        ; Read score
+        MOVW    R0, #:LOWER16:g_stress_score
+        MOVT    R0, #:UPPER16:g_stress_score
+        LDR     R6, [R0]
+
+        ; Choose color: green < 60, yellow < 80, red >= 80
+        MOVW    R7, #COLOR_GREEN
+        CMP     R6, #60
+        BLO     Stress_Color_Done
+        MOVW    R7, #COLOR_YELLOW
+        CMP     R6, #80
+        BLO     Stress_Color_Done
+        MOVW    R7, #COLOR_RED
+Stress_Color_Done
+
+        ; Draw score number (large, x=90)
+        MOVS    R0, #90
+        MOVS    R1, #93
+        MOV     R2, R6
+        MOV     R3, R7
+        BL      TFT_Draw_Number6
+
+        ; Draw % immediately after number (x=148, tightly spaced)
+        MOVS    R0, #148
+        MOVS    R1, #106
+        MOVW    R2, #:LOWER16:StrStressPct
+        MOVT    R2, #:UPPER16:StrStressPct
+        MOVW    R3, #COLOR_WHITE
+        BL      TFT_Draw_String2x
+
+        ; Reload score (caller-saved regs may have changed)
+        MOVW    R0, #:LOWER16:g_stress_score
+        MOVT    R0, #:UPPER16:g_stress_score
+        LDR     R6, [R0]
+
+        ; Draw NORMAL or STRESSED status label
+        CMP     R6, #60
+        BHS     Stress_Show_Stressed
+
+        ; NORMAL — green
+        MOVS    R0, #95
+        MOVS    R1, #140
+        MOVW    R2, #:LOWER16:StrNormal
+        MOVT    R2, #:UPPER16:StrNormal
+        MOVW    R3, #COLOR_GREEN
+        BL      TFT_Draw_String2x
+        B       Stress_Status_Done
+
+Stress_Show_Stressed
+        ; STRESSED — red
+        MOVS    R0, #68
+        MOVS    R1, #140
+        MOVW    R2, #:LOWER16:StrStressed
+        MOVT    R2, #:UPPER16:StrStressed
+        MOVW    R3, #COLOR_RED
+        BL      TFT_Draw_String2x
+
+Stress_Status_Done
+        POP     {R4-R7, PC}
 
 ;-----------------------------------------------------------------------------
 ; 5x7 font
