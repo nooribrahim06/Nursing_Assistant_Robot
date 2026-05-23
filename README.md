@@ -254,14 +254,15 @@ The entire UI is driven by a single shared variable `g_sys_state`. On each loop 
 
 **States defined in `constants.s`:**
 
-> ✍️ *Fill in your actual states and what each one displays.*
-
 | State ID | Name | Description |
 |----------|------|-------------|
 | 0x00 | `MAIN_MENU` | Home screen, shows all feature icons |
 | 0x01 | `HEART_RATE` | BPM display + animated heart |
 | 0x02 | `BREATHING` | Real-time breathing waveform |
-| ... | ✍️ | ✍️ |
+| 0x03 | `STATE_MED_WAITING` | Displays background countdown before dispensing |
+| 0x04 | `STATE_MED_ALERT`   | Triggers servo step-rotation and UI alert |
+
+![TFT Main Menu UI](imgs/tft_ui_menu.png)
 
 **State dispatch (how the machine routes to each screen):**
 
@@ -638,12 +639,17 @@ BNE     SAN_DelayLoop
 
 ### Simulation — Fill Screen with Color
 ![fill screen](examples%20for%20Proteus/Fill%20Screen/fillScreenExample.png)
+![Main Menu Simulation](imgs/main_menu_sim.png)
 
 ### Simulation — Draw Image on TFT
 ![draw image](examples%20for%20Proteus/Drawing%20Image/drawingImage.png)
 
+### Simulation — External IR Station Circuit
+![IR Station Circuit](imgs/ir_station_sim.jpg)
+
 ### Hardware
-> ✍️ *Add photos of your assembled robot / device running here.*
+![Real Robot Hardware 1](imgs/robot1.jpg)
+![Real Robot Hardware 2](imgs/robot2.jpg)
 
 ---
 
