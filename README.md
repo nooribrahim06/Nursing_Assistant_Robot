@@ -1,8 +1,30 @@
-# 🤖 Nursing Assistant Robot
+# 🤖 Robo — The Nurse Assistant
 
-![Assembled Robot](imgs/robot.png)
+![Assembled Robot](imgs/Robo.jpg)
 
-> An autonomous clinical assistance robot written entirely in **ARM Assembly (Thumb-2)** targeting the **STM32F401RC** microcontroller. Designed to navigate hospital corridors, monitor patient vitals, sanitise hands, and dispense medications—programmed at the bare-metal register level with no HAL, CMSIS, or OS libraries.
+> An autonomous clinical assistance robot written entirely in **ARM Assembly (Thumb-2)** targeting the **STM32F401RC** microcontroller. Designed to navigate hospital corridors, monitor patient vitals, sanitise hands, and dispense medications — programmed at the bare-metal register level with no HAL, CMSIS, or OS libraries.
+
+---
+
+### 🎓 Project Info
+
+**Microprocessors Final Project** — Cairo University, Faculty of Engineering, Computer Engineering Department
+
+| | |
+|:---:|:---:|
+| Nour Ibrahim | Youmna Mohamed |
+| Yehia Mahmoud | Yasmine Ismail |
+| Yassin Abdelatty | Mostafa El Shazly |
+| Moaz Amr | Anton Azer |
+| Maryam Gamal | Hashem Mohamed |
+
+---
+
+## 🎬 Demo Video
+
+> **▶ [Watch Robo in Action — Full Demo on YouTube](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)**
+>
+> *(Replace the link above with the actual YouTube video URL once uploaded)*
 
 ---
 
@@ -43,7 +65,7 @@
   - [9. Landolt C Vision Test](#9-landolt-c-vision-test)
   - [10. Autonomous Line-Tracking Guidance](#10-autonomous-line-tracking-guidance)
   - [11. Mobile App Bluetooth Override](#11-mobile-app-bluetooth-override)
-  - [12. Bedside IR station call-docking feature](#12-bedside-ir-station-call-docking-feature)
+  - [12. Bedside IR Station Call-Docking Feature](#12-bedside-ir-station-call-docking-feature)
 - [📱 Mobile App Control](#-mobile-app-control)
 - [📷 Visual Walkthrough \& Simulation](#-visual-walkthrough--simulation)
 - [🙏 Acknowledgements](#-acknowledgements)
@@ -54,11 +76,11 @@
 
 In medical wards, reducing contact between clinical staff and infectious patients is critical. The **Nursing Assistant Robot** is a modular, low-cost autonomous assistant that navigates wards, delivers scheduled medications, detects fires, and checks patient diagnostics.
 
-This project is a bare-metal engineering endeavor written entirely in **ARM Assembly**. Every operation—from software I2C bit-banging to high-speed SPI display transmissions and multi-channel analog filtration—is done by directly manipulating registers. No HAL, no CMSIS-Drivers, no C libraries.
+This project is a bare-metal engineering endeavor written entirely in **ARM Assembly**. Every operation — from software I2C bit-banging to high-speed SPI display transmissions and multi-channel analog filtration — is done by directly manipulating registers. No HAL, no CMSIS-Drivers, no C libraries.
 
 ---
 
-## 📱 System Architecture & numbers Mapping
+## 📱 System Architecture & Keypad Mapping
 
 The user interface is driven by an IR Remote Control mapped to a central state machine. Pressing key numbers triggers hardware-level interrupts that transition the robot between screens and operational routines. Key `0` is an independent selection key that directs users to the sub-feature menu.
 
@@ -111,7 +133,7 @@ The user interface is driven by an IR Remote Control mapped to a central state m
              ┌────────────────────────────────────┴────────────────────────────────────┐
              ▼                                                                         ▼
    [STM32F401RC MCU Core]                                                       [Actuators & Sensors]
-    ├─ SPI1 Bus ───────────────────────────────────────────────────────────────► ILI9341 2.8" TFT Display
+    ├─ SPI1 Bus ───────────────────────────────────────────────────────────────► ILI9341 3.2" TFT Display
     ├─ I2C1 Bus ───────────────────────────────────────────────────────────────► MAX30102 Pulse Oximeter
     ├─ USART2 ─────────────────────────────────────────────────────────────────► HC-05 Bluetooth Module
     ├─ ADC1 (PA0/PA1/PA7) ─────────────────────────────────────────────────────► MQ-2, Breathing, Vein Sensors
@@ -126,7 +148,7 @@ The user interface is driven by an IR Remote Control mapped to a central state m
 
 1. **Chassis & Motion**: 6-wheel drive chassis, 6 TT DC Motors driven by two motor drivers, 1 line tracker sensor board (3 IR sensors on `PB12–PB14`).
 2. **Core MCU**: STM32F401RC (ARM Cortex-M4, 16 MHz), ST-Link V2 SWD debugger, 3x 18650 Li-ion batteries (11.1V), 5V step-down buck converter.
-3. **Display & UI**: ILI9341 2.8" Color TFT LCD over SPI1, piezo buzzer on `PB4`, IR receiver on `PB10` + IR remote.
+3. **Display & UI**: ILI9341 3.2" Color TFT LCD over SPI1, piezo buzzer on `PB4`, IR receiver on `PB10` + IR remote.
 4. **Actuators**: SG90/MG995 servo on `PA6` (TIM3 CH1) for medicine dispensing, mini submersible 5V water pump via relay on `PA5`.
 5. **Sensors**: MAX30102 pulse oximeter on I2C1 (`PB8/PB9`), MQ-2 gas sensor on `PA1` (ADC CH1), HC-SR04 sonar on `PC15` (Trig) / `PC14` (Echo), sanitizer proximity IR on `PA4`, bedside IR alignment receiver.
 6. **Discrete Components**: Safety diodes, push-buttons, IR LEDs, pull-down resistors, 74HC logic latches, decoders, battery holder, 3 breadboards, and jumper wires.
@@ -248,14 +270,14 @@ g_ms_ticks              SPACE   4       ; Uptime clock in milliseconds
         END
 ```
 
-*   **Address Mapping**: Hardware registers are set using the base-plus-offset address pattern (e.g., `RCC_BASE` + `RCC_AHB1ENR` offset). This decouples physical configurations from high-level logical assignments.
-*   **Access Scoping**: Global system variables are declared inside `global.s` inside the `READWRITE` data section, aligned to standard 32-bit boundaries. Access across the compiler boundaries is granted by marking them as `EXPORT` at the source and `IMPORT` inside individual assemblies.
+- **Address Mapping**: Hardware registers are set using the base-plus-offset address pattern (e.g., `RCC_BASE` + `RCC_AHB1ENR` offset). This decouples physical configurations from high-level logical assignments.
+- **Access Scoping**: Global system variables are declared inside `global.s` inside the `READWRITE` data section, aligned to standard 32-bit boundaries. Access across compiler boundaries is granted by marking them as `EXPORT` at the source and `IMPORT` inside individual assemblies.
 
 ---
 
 ### 🔄 Super-Loop Scheduler (main.s)
 
-**File:** [core/main.s](file:///d:/CMP-year%201/Second%20Term/Micro/Project/nurse1/core/main.s)
+**File:** `core/main.s`
 
 The main loop runs continuously after boot, coordinating non-blocking tasks.
 
@@ -273,15 +295,16 @@ The main loop runs continuously after boot, coordinating non-blocking tasks.
 │             MAIN LOOP (Continuous)           │
 │                                              │
 │  1. Check incoming Bluetooth serial stream   │
-│  2. Handle Bluetooth motion mode overrides   │
-│  3. Read & debounce IR Remote commands       │
-│  4. Run environmental fire check (MQ-2 ADC)  │
-│  5. Run Background Tasks (Meds, buzzer, etc.)│
-│  6. Execute active state logic (vein, ppg)   │
-│  7. Check if 100ms has elapsed since draw    │
+│  2. Inject virtual keypad presses from BT    │
+│  3. Handle Bluetooth motion mode overrides   │
+│  4. Read & debounce IR Remote commands       │
+│  5. Run environmental fire check (MQ-2 ADC)  │
+│  6. Run Background Tasks (Meds, buzzer, etc.)│
+│  7. Execute active state logic (vein, ppg)   │
+│  8. Check if 100ms has elapsed since draw    │
 │     ├─ YES: Trigger TFT UI Update screen     │
 │     └─ NO:  Skip draw step                   │
-│  8. Run State Transition Cleanup routines    │
+│  9. Run State Transition Cleanup routines    │
 └──────────────────────┬───────────────────────┘
                        │
                        ▼
@@ -291,6 +314,7 @@ The main loop runs continuously after boot, coordinating non-blocking tasks.
 ```assembly
 Main_Loop
         BL      BT_RxTask                   ; Check incoming Bluetooth serial stream
+        BL      Main_ProcessBTKeyInjection  ; Inject virtual keypad presses from BT
         BL      Main_ProcessBluetoothCmd    ; Handle driving mode overrides
         BL      Main_CheckIRInput           ; Debounce and check IR keypad inputs
         BL      Smoke_Check                 ; Read smoke sensor and check alarm flags
@@ -319,9 +343,9 @@ Main_SkipUI
 
 ### 🧭 Central State Machine (ui_state.s)
 
-**File:** [core/ui_state.s](file:///d:/CMP-year%201/Second%20Term/Micro/Project/nurse1/core/ui_state.s)
+**File:** `core/ui_state.s`
 
-Directs page routing based on the state machine variables. 
+Directs page routing based on the state machine variables.
 
 Alarms take absolute priority, with medication alarms locking down the display and smoke alarms applying a **5-second safety snooze cooldown** (`SMOKE_COOLDOWN_MS`) between dismissals. During active medication programming, smoke interrupts are suppressed to prevent data loss.
 
@@ -502,7 +526,7 @@ CCR range: 0 (stopped) to 999 (full speed)
 
 ### 🖥️ TFT SPI Driver (`tft_low.s`)
 
-**What this file does:** Initializes the ILI9341 display controller over SPI1 and provides the low-level primitives that the graphics engine (`tft_gfx.s`) builds on top of. This is the most latency-sensitive driver in the project — every pixel written goes through here.
+**What this file does:** Initializes the ILI9341 3.2" display controller over SPI1 and provides the low-level primitives that the graphics engine (`tft_gfx.s`) builds on top of. This is the most latency-sensitive driver in the project — every pixel written goes through here.
 
 **Pin map:**
 ```
@@ -548,7 +572,7 @@ After this, any 16-bit color values sent via `TFT_WriteData16` fill the window l
 **ILI9341 Init sequence (`TFT_Init`):** After reset, the init sequence sends power control, VCOM, frame rate, display function, and finally MADCTL `0x28` (landscape orientation, BGR color order). `PIXFMT 0x55` sets RGB565 — 5 bits red, 6 bits green, 5 bits blue, 2 bytes per pixel.
 
 > **Simulation screenshot of TFT waveforms in Proteus:**
-> ![TFT SPI Simulation](imgs/tft_sim.png)
+> ![TFT SPI Simulation](imgs/tft_ui_menu.png)
 
 ---
 
@@ -602,7 +626,7 @@ State 2 (RECEIVING BITS):
 
 ---
 
-### 📶 Bluetooth Driver (bluetooth.s & bluetooth_buffer.s)
+### 📶 Bluetooth Driver (`bluetooth.s` & `bluetooth_buffer.s`)
 
 **What these files do:** Implement a full two-way Bluetooth communication layer over USART2, connecting the robot to the Robo Mobile App via an HC-05 module. The layer handles three responsibilities cleanly separated from the rest of the code: receiving and parsing motion commands from the app, periodically transmitting structured vitals packets to the app, and remotely dismissing alerts (smoke and medication) over the air.
 
@@ -625,14 +649,14 @@ State 2 (RECEIVING BITS):
 
 **Receiving a command (`BT_RxTask`):**
 Called once per main loop iteration. Deliberately reads at most one full line per call to avoid starving the scheduler.
-*   Poll USART2_SR for RXNE (Receive Not Empty):
-    *   No byte ready: exit immediately (non-blocking).
-    *   Byte ready: read USART2_DR (clears RXNE automatically).
-        *   CR (0x0D): ignore, continue polling.
-        *   LF (0x0A): line complete → null-terminate buffer → call `BT_ParseLine` → clear buffer.
-        *   Any other byte: append to `bt_rx_buffer[bt_rx_index++]`.
-            *   If `bt_rx_index >= 79` (buffer full): discard entire line (overflow protection).
-*   Every received byte also updates `g_bt_last_rx_tick` with the current SysTick millisecond count. The motion layer uses this timestamp to detect the 2-second BT inactivity timeout and resume autonomous line tracking.
+- Poll USART2_SR for RXNE (Receive Not Empty):
+  - No byte ready: exit immediately (non-blocking).
+  - Byte ready: read USART2_DR (clears RXNE automatically).
+    - CR (0x0D): ignore, continue polling.
+    - LF (0x0A): line complete → null-terminate buffer → call `BT_ParseLine` → clear buffer.
+    - Any other byte: append to `bt_rx_buffer[bt_rx_index++]`.
+      - If `bt_rx_index >= 79` (buffer full): discard entire line (overflow protection).
+- Every received byte also updates `g_bt_last_rx_tick` with the current SysTick millisecond count. The motion layer uses this timestamp to detect the 2-second BT inactivity timeout and resume autonomous line tracking.
 
 **Parsing a command (`BT_ParseLine`):**
 Uses substring matching rather than exact string equality. This means the app can send "CMD=FWD\n", "DIR:FWD\n", or just "FWD\n" — any format containing the keyword is accepted. This made the app development much easier and made the robot robust to minor protocol changes.
@@ -641,14 +665,15 @@ Uses substring matching rather than exact string equality. This means the app ca
 ; BT_Contains scans bt_rx_buffer byte-by-byte using BT_StartsWith at each position
 ; BT_StartsWith does a byte-by-byte comparison until the substring runs out (match) or a mismatch
 
-Check for "FWD"   -> BT_SetDirRequest(BT_DIR_FWD=1)  + BT_QueueACK
-Check for "BACK"  -> BT_SetDirRequest(BT_DIR_BACK=2) + BT_QueueACK
-Check for "LEFT"  -> BT_SetDirRequest(BT_DIR_LEFT=3) + BT_QueueACK
-Check for "RIGHT" -> BT_SetDirRequest(BT_DIR_RIGHT=4)+ BT_QueueACK
-Check for "STOP"  -> BT_SetDirRequest(BT_DIR_STOP=5) + BT_QueueACK
-Check for "PHONE" -> BT_SetModeRequest(BT_MODE_PHONE=2)+ BT_QueueACK
-Check for "LINE"  -> BT_SetModeRequest(BT_MODE_LINE=1) + BT_QueueACK
-Check for "OFF"   -> check if also contains "MED" or "SMOKE" -> clear the respective alarm flag
+Check for "FWD"        -> BT_SetDirRequest(BT_DIR_FWD=1)   + BT_QueueACK
+Check for "BACK"       -> BT_SetDirRequest(BT_DIR_BACK=2)  + BT_QueueACK
+Check for "LEFT"       -> BT_SetDirRequest(BT_DIR_LEFT=3)  + BT_QueueACK
+Check for "RIGHT"      -> BT_SetDirRequest(BT_DIR_RIGHT=4) + BT_QueueACK
+Check for "STOP"       -> BT_SetDirRequest(BT_DIR_STOP=5)  + BT_QueueACK
+Check for "PHONE"      -> BT_SetModeRequest(BT_MODE_PHONE=2)+ BT_QueueACK
+Check for "LINE"       -> BT_SetModeRequest(BT_MODE_LINE=1) + BT_QueueACK
+Check for "CMD=UI"     -> BT_Handle_UIKey + BT_QueueACK     (virtual keypad)
+Check for "OFF"        -> check if also contains "MED" or "SMOKE" -> clear alarm flag
 ```
 
 `BT_SetDirRequest` and `BT_SetModeRequest` both write to the shared RAM flags (`g_bt_motion_dir_request`, `g_bt_motion_mode_request`, `g_bt_cmd_ready = 1`) that the motion layer polls each cycle. Only one of the two request fields is set per command — the other is explicitly zeroed to prevent stale commands.
@@ -658,10 +683,10 @@ When the app sends a command containing both "OFF" and "SMOKE", the handler clea
 
 **Transmitting packets (`BT_TxTask` + `BT_PeriodicTask`):**
 The TX side uses a flat byte buffer in RAM (`bt_tx_buffer`, 192 bytes). Packets are assembled in-place by calling:
-*   `BT_StartPacket`     -> resets `bt_tx_len` and `bt_tx_index` to 0
-*   `BT_AppendString`    -> copies a null-terminated string from flash into `bt_tx_buffer` byte by byte
-*   `BT_AppendU32`       -> converts a 32-bit integer to decimal ASCII digits using `UDIV`/`MLS` (digits are built in reverse order into `bt_num_buffer`, then copied forward)
-*   `BT_AppendChar`      -> appends a single character, always keeps the buffer null-terminated
+- `BT_StartPacket`     → resets `bt_tx_len` and `bt_tx_index` to 0
+- `BT_AppendString`    → copies a null-terminated string from flash into `bt_tx_buffer` byte by byte
+- `BT_AppendU32`       → converts a 32-bit integer to decimal ASCII digits using `UDIV`/`MLS` (digits are built in reverse order into `bt_num_buffer`, then copied forward)
+- `BT_AppendChar`      → appends a single character, always keeps the buffer null-terminated
 
 `BT_TxTask` sends the assembled packet by polling `USART_SR_TXE` (Transmit Empty) before writing each byte to `USART_DR`. Critically, it calls `BT_RxTask` on every iteration of the TX wait loop — so incoming joystick commands are never dropped while a vitals packet is being sent out.
 
@@ -669,9 +694,9 @@ The TX side uses a flat byte buffer in RAM (`bt_tx_buffer`, 192 bytes). Packets 
 Every main loop call:
 1. Run `BT_TxTask` (drain any pending bytes).
 2. If TX buffer is idle:
-   a. `BT_CheckMedEvent`   -> if `sys_state` just left `STATE_MED_DISPENSE`, queue `"TYPE=MED_EVENT,...,STATUS=DISPENSED\r\n"`.
-   b. `BT_CheckSmokeAlert` -> if `Smoke_Alert_Flag` is set and 5000ms since last alert TX, queue `"TYPE=ALERT,...,SMOKE=<level>\r\n"`.
-   c. Every 250ms: `BT_QueueVitals` -> queue full vitals packet.
+   a. `BT_CheckMedEvent`   → if `sys_state` just left `STATE_MED_DISPENSE`, queue `"TYPE=MED_EVENT,...,STATUS=DISPENSED\r\n"`.
+   b. `BT_CheckSmokeAlert` → if `Smoke_Alert_Flag` is set and 5000ms since last alert TX, queue `"TYPE=ALERT,...,SMOKE=<level>\r\n"`.
+   c. Every 250ms: `BT_QueueVitals` → queue full vitals packet.
 
 **Vitals packet format (sent every 250ms):**
 `TYPE=VITALS,PATIENT=001,BPM=<bpm>,SPO2=<spo2>,BREATH=<breath>,SMOKE=<smoke>,MED=<timer>,ALERT=<NONE|SMOKE_DETECTED|MED_ALERT|SMOKE_AND_MED>\r\n`
@@ -680,8 +705,7 @@ All numeric values (`g_bpm`, `g_spo2`, `g_breath_level`, `g_smoke_level`, `g_med
 
 **Tricky part — `BT_AppendU32` digit reversal:** The standard decimal conversion (`% 10` loop) naturally produces digits in LSB-first order (least significant digit first). The function writes them into `bt_num_buffer` (12 bytes) in that reversed order, tracking the count in `R5`, then copies them out in reverse to get the correct string. Special-casing 0 is also required because the loop would exit immediately and produce an empty string otherwise.
 
-**Tricky part — `LTORG` placement:** Every large function in `bluetooth.s` ends with `ALIGN` + `LTORG`. Without this, the assembler's literal pool (used for `LDR R0, =some_address` loads) can exceed 4KB distance from the instruction, causing an `A1284E` assembler error. Since this file is large and uses many address literals, `LTORG blocks` are mandatory after every ~30–50 instructions.
-
+**Tricky part — `LTORG` placement:** Every large function in `bluetooth.s` ends with `ALIGN` + `LTORG`. Without this, the assembler's literal pool (used for `LDR R0, =some_address` loads) can exceed 4KB distance from the instruction, causing an `A1284E` assembler error. Since this file is large and uses many address literals, `LTORG` blocks are mandatory after every ~30–50 instructions.
 
 ---
 
@@ -733,17 +757,14 @@ MOVS    R1, #STATION_IR_PIN
 BL      GPIO_ReadPin
 EOR     R0, R0, #1              ; Invert logic (0 -> 1 = detected, 1 -> 0 = not detected)
 ```
-*   If the current pin state matches the globally stored status (`g_station_detected`), the debounce counter (`station_debounce_cnt`) is reset to `0`.
-*   If the pin state differs from the current global status, the debounce counter is incremented by `1`.
-*   When the debounce counter reaches `DEBOUNCE_THRESHOLD = 5`, it toggles the global state variable `g_station_detected` to the new stable reading and resets the counter to `0`.
+- If the current pin state matches the globally stored status (`g_station_detected`), the debounce counter (`station_debounce_cnt`) is reset to `0`.
+- If the pin state differs from the current global status, the debounce counter is incremented by `1`.
+- When the debounce counter reaches `DEBOUNCE_THRESHOLD = 5`, it toggles the global state variable `g_station_detected` to the new stable reading and resets the counter to `0`.
 
 **Checking detection state (`StationIR_IsDetected`):**
 Returns the debounced state stored in `g_station_detected` (returns `1` if the robot is aligned at a station, `0` if not) in register `R0`.
 
 **Tricky part — Active-Low Signal & Ambient Noise Filtering:** Since the sensor output is active-low (pulls to `0` when sensing an IR beacon), raw readings must be inverted with `EOR R0, R0, #1`. Without the 5-sample debounce verification window, ambient light fluctuations in a hospital corridor or sensor jitter would trigger false stops, causing the robot to dock prematurely.
-
-> **IR Station Alignment Simulation Screenshot:**
-> ![IR Station Alignment Simulation](imgs/ir_station_sim.png)
 
 ---
 
@@ -753,86 +774,107 @@ Every source file in the repository corresponds to a modular component of the ro
 
 ### 1. Core System Files
 
-*   **`core/main.s`**:
-    *   *Purpose*: The primary scheduler and initialization module.
-    *   *Logic*: Performs memory sweeps during boot (`Main_InitGlobals`), calls setup subroutines, and sets up a $1\text{ms}$ metronome interrupt using the **SysTick** timer reload register. It schedules non-blocking checks in a loop, routes states, and throttles visual drawing refreshes.
-*   **`core/constants.s`**:
-    *   *Purpose*: Hardware and state symbol definitions.
-    *   *Logic*: Defines assembly constants (`EQU`) for peripheral addresses (RCC, GPIO, ADC, TIM, USART, SPI), TFT color profiles, state indices, and key codes. Contains no executable code to save memory.
-*   **`core/global.s`**:
-    *   *Purpose*: Declares shared variables in RAM.
-    *   *Logic*: Declares 32-bit aligned variables (using the `SPACE 4` command) within the `VARIABLES` SRAM read-write data section. These variables are `EXPORT`ed for project-wide visibility.
-*   **`core/gpio.s`**:
-    *   *Purpose*: Low-level port controller library.
-    *   *Logic*: Implements modular routines to enable peripheral clocks (`GPIO_EnableClock`) via `RCC_AHB1ENR`, configure inputs (`GPIO_ConfigInput`), configure outputs (`GPIO_ConfigOutput`), write pin states (`GPIO_WritePin`/`GPIO_ClearPin`) using the bit set/reset register (`GPIO_BSRR`), and read pin states (`GPIO_ReadPin`) using the input data register (`GPIO_IDR`).
-*   **`core/motion_constants.s`**:
-    *   *Purpose*: Static motion parameters.
-    *   *Logic*: Contains `EQU` constants for motor speed PWM duty cycles (straight driving, slow turning, tank spin-in-place) and the 2-second Bluetooth manual control timeout fail-safe.
-*   **`core/ui_state.s`**:
-    *   *Purpose*: Core UI event router and state dispatcher.
-    *   *Logic*: Processes raw IR keypresses, coordinates menu navigation, handles global alarms (fire and medication alert overrides), clears the TFT screen during transitions, and limits wave plotting update rates.
+- **`core/main.s`**:
+  - *Purpose*: The primary scheduler and initialization module.
+  - *Logic*: Performs memory sweeps during boot (`Main_InitGlobals`), calls setup subroutines, and sets up a $1\text{ms}$ metronome interrupt using the **SysTick** timer reload register. It schedules non-blocking checks in a loop, routes states, and throttles visual drawing refreshes.
+
+- **`core/constants.s`**:
+  - *Purpose*: Hardware and state symbol definitions.
+  - *Logic*: Defines assembly constants (`EQU`) for peripheral addresses (RCC, GPIO, ADC, TIM, USART, SPI), TFT color profiles, state indices, and key codes. Contains no executable code to save memory.
+
+- **`core/global.s`**:
+  - *Purpose*: Declares shared variables in RAM.
+  - *Logic*: Declares 32-bit aligned variables (using the `SPACE 4` command) within the `VARIABLES` SRAM read-write data section. These variables are `EXPORT`ed for project-wide visibility.
+
+- **`core/gpio.s`**:
+  - *Purpose*: Low-level port controller library.
+  - *Logic*: Implements modular routines to enable peripheral clocks (`GPIO_EnableClock`) via `RCC_AHB1ENR`, configure inputs (`GPIO_ConfigInput`), configure outputs (`GPIO_ConfigOutput`), write pin states (`GPIO_WritePin`/`GPIO_ClearPin`) using the bit set/reset register (`GPIO_BSRR`), and read pin states (`GPIO_ReadPin`) using the input data register (`GPIO_IDR`).
+
+- **`core/motion_constants.s`**:
+  - *Purpose*: Static motion parameters.
+  - *Logic*: Contains `EQU` constants for motor speed PWM duty cycles (straight driving, slow turning, tank spin-in-place) and the 2-second Bluetooth manual control timeout fail-safe.
+
+- **`core/ui_state.s`**:
+  - *Purpose*: Core UI event router and state dispatcher.
+  - *Logic*: Processes raw IR keypresses, coordinates menu navigation, handles global alarms (fire and medication alert overrides), clears the TFT screen during transitions, and limits wave plotting update rates.
 
 ### 2. Clinical Feature Files
 
-*   **`features/breathing.s`**:
-    *   *Purpose*: Breathing waveform processor.
-    *   *Logic*: Samples `PA0` via the ADC, tracks baseline drift to keep the signal centered, and amplifies the signal to display scrolling breathing waveforms on the TFT screen.
-*   **`features/ir_stations.s`**:
-    *   *Purpose*: Bedside call and alignment module.
-    *   *Logic*: Monitors bedside IR call beacons. When a call signal is detected, the robot stops to administer clinical care.
-*   **`features/max.s`**:
-    *   *Purpose*: Vitals acquisition module using the MAX30102.
-    *   *Logic*: Manages bit-banged I2C read and write transactions. It configures I2C registers, checks FIFO pointers, reads raw red and infrared channel data, filters raw values, and calculates BPM and blood oxygen saturation ($SpO_2$) when a finger is detected.
-*   **`features/medicine.s`**:
-    *   *Purpose*: Medication scheduler and dispenser actuator.
-    *   *Logic*: Converts user input into a background countdown. Once the timer reaches zero, the system sounds an alarm, waits for user confirmation, and rotates a positional servo motor using step-by-step PWM pulses on `PA6` ($0^{\circ}$ at $500\text{ }\mu\text{s}$, $90^{\circ}$ at $1500\text{ }\mu\text{s}$, $180^{\circ}$ at $2500\text{ }\mu\text{s}$).
-*   **`features/motion_bt.s`**:
-    *   *Purpose*: Bluetooth driving command parser.
-    *   *Logic*: Maps Bluetooth remote commands (forward, backward, spin turn, stop) to low-level motor drivers.
-*   **`features/santizing.s`**:
-    *   *Purpose*: Automatic gel dispenser module.
-    *   *Logic*: Reads the active-low proximity sensor on `PA4`. When a hand is detected, the system activates the relay pump on `PA5` and runs a software delay loop to dispense gel.
-*   **`features/smoke.s`**:
-    *   *Purpose*: Fire alarm monitor.
-    *   *Logic*: Samples the MQ-2 sensor on `PA1`. It implements a 30-second startup delay to allow the sensor to warm up, averages readings to prevent false alarms, and flags a system-wide fire alarm if sustained smoke is detected.
-*   **`features/stress.s`**:
-    *   *Purpose*: Heart rate volatility analyzer.
-    *   *Logic*: Calculates a psychological stress score based on heart rate fluctuations:
-        $$\text{Stress Score} = (\text{BPM} - 60) \times 2$$
-        It adds subtle visual noise (`g_ms_ticks & 3`) to keep the graph display animated.
-*   **`features/ultrasonic.s`**:
-    *   *Purpose*: Collision avoidance module.
-    *   *Logic*: Emits trigger pulses on trigger pin `PC15` and reads the return pulse duration on echo pin `PC14` to calculate the distance to obstacles for safety stops.
-*   **`features/vein.s`**:
-    *   *Purpose*: Sub-dermal vein finder.
-    *   *Logic*: Samples the IR reflectance sensor on `PA7`. It averages **8 readings** to filter out noise, establishes a baseline from **128 readings**, and maps light absorption levels to dynamic buzzer beep frequencies to guide clinicians.
+- **`features/breathing.s`**:
+  - *Purpose*: Breathing waveform processor.
+  - *Logic*: Samples `PA0` via the ADC, tracks baseline drift to keep the signal centered, and amplifies the signal to display scrolling breathing waveforms on the TFT screen.
+
+- **`features/ir_stations.s`**:
+  - *Purpose*: Bedside call and alignment module.
+  - *Logic*: Monitors bedside IR call beacons. When a call signal is detected, the robot stops to administer clinical care.
+
+- **`features/max.s`**:
+  - *Purpose*: Vitals acquisition module using the MAX30102.
+  - *Logic*: Manages hardware I2C read and write transactions. It configures I2C registers, checks FIFO pointers, reads raw red and infrared channel data, filters raw values, and calculates BPM and blood oxygen saturation ($SpO_2$) when a finger is detected.
+
+- **`features/medicine.s`**:
+  - *Purpose*: Medication scheduler and dispenser actuator.
+  - *Logic*: Converts user input into a background countdown. Once the timer reaches zero, the system sounds an alarm, waits for user confirmation, and rotates a positional servo motor using step-by-step PWM pulses on `PA6` ($0^{\circ}$ at $500\text{ }\mu\text{s}$, $90^{\circ}$ at $1500\text{ }\mu\text{s}$, $180^{\circ}$ at $2500\text{ }\mu\text{s}$).
+
+- **`features/motion_bt.s`**:
+  - *Purpose*: Bluetooth driving command parser.
+  - *Logic*: Maps Bluetooth remote commands (forward, backward, spin turn, stop) to low-level motor drivers.
+
+- **`features/santizing.s`**:
+  - *Purpose*: Automatic gel dispenser module.
+  - *Logic*: Reads the active-low proximity sensor on `PA4`. When a hand is detected, the system activates the relay pump on `PA5` and runs a software delay loop to dispense gel.
+
+- **`features/smoke.s`**:
+  - *Purpose*: Fire alarm monitor.
+  - *Logic*: Samples the MQ-2 sensor on `PA1`. It implements a 30-second startup delay to allow the sensor to warm up, averages readings to prevent false alarms, and flags a system-wide fire alarm if sustained smoke is detected.
+
+- **`features/stress.s`**:
+  - *Purpose*: Heart rate volatility analyzer.
+  - *Logic*: Calculates a psychological stress score based on heart rate fluctuations:
+    $$\text{Stress Score} = (\text{BPM} - 60) \times 2$$
+    It adds subtle visual noise (`g_ms_ticks & 3`) to keep the graph display animated.
+
+- **`features/ultrasonic.s`**:
+  - *Purpose*: Collision avoidance module.
+  - *Logic*: Emits trigger pulses on trigger pin `PC15` and reads the return pulse duration on echo pin `PC14` to calculate the distance to obstacles for safety stops.
+
+- **`features/vein.s`**:
+  - *Purpose*: Sub-dermal vein finder.
+  - *Logic*: Samples the IR reflectance sensor on `PA7`. It averages **8 readings** to filter out noise, establishes a baseline from **128 readings**, and maps light absorption levels to dynamic buzzer beep frequencies to guide clinicians.
 
 ### 3. Peripheral Driver Files
 
-*   **`Drivers/adc.s`**:
-    *   *Purpose*: Bare-metal ADC1 driver.
-    *   *Logic*: Enables the ADC1 peripheral clock, configures `PA0` and `PA1` pins for analog mode, and sets sample time sequences. It also configures the **Analog Watchdog (AWD)** to monitor channel 1 and trigger interrupts in the NVIC if readings exceed thresholds.
-*   **`Drivers/i2c.s`**:
-    *   *Purpose*: Bit-banged I2C Master driver.
-    *   *Logic*: Implements standard I2C start, stop, write, read, ack, and nack operations by toggling the GPIO open-drain SDA (`PB9`) and SCL (`PB8`) lines.
-*   **`Drivers/pwm.s`**:
-    *   *Purpose*: Hardware Timer PWM driver.
-    *   *Logic*: Sets up `TIM3` and `TIM4` registers to output PWM waveforms for the positional medicine servo and motor speed controllers.
-*   **`Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`**:
-    *   *Purpose*: USART2 driver and ring buffers.
-    *   *Logic*: Configures `PA2` (TX) and `PA3` (RX) to alternate functions. It implements non-blocking serial communication using USART interrupts and circular ring buffers in RAM.
-*   **`Drivers/buzzer.s`**:
-    *   *Purpose*: Beeper driver on `PB4`.
-    *   *Logic*: Manages periodic buzzer beeps during active alarm states.
-*   **`Drivers/tft_low.s`**:
-    *   *Purpose*: ILI9341 register and SPI1 driver.
-    *   *Logic*: Configures `PB0` (CS), `PB1` (DC), `PB2` (RST), and SPI1 alternate function pins (`PB3`/`PB5`). It configures the SPI1 register block, manages command and data modes, and initializes the ILI9341 display.
-*   **`Drivers/tft_gfx.s`**:
-    *   *Purpose*: Custom 2D graphics rendering engine.
-    *   *Logic*: Defines subroutines to clear the screen, define active pixel coordinate windows, fill rectangular blocks, render ASCII characters using custom font arrays, plot coordinate vectors, and draw real-time scrolling wave graphs.
-*   **`motion.s` (Root File)**:
-    *   *Purpose*: Unified motor guidance manager.
-    *   *Logic*: Reads the line tracking sensor array, determines direction adjustments using a decision tree, and controls motor inputs. It also implements safety checks that stop the robot if an obstacle is detected within $15\text{cm}$ or when bedside call beacons are aligned.
+- **`Drivers/adc.s`**:
+  - *Purpose*: Bare-metal ADC1 driver.
+  - *Logic*: Enables the ADC1 peripheral clock, configures `PA0` and `PA1` pins for analog mode, and sets sample time sequences. It also configures the **Analog Watchdog (AWD)** to monitor channel 1 and trigger interrupts in the NVIC if readings exceed thresholds.
+
+- **`Drivers/i2c.s`**:
+  - *Purpose*: Hardware I2C1 Master driver.
+  - *Logic*: Implements standard I2C start, stop, write, read, ack, and nack operations by managing the I2C1 hardware peripheral over open-drain SDA (`PB9`) and SCL (`PB8`) lines.
+
+- **`Drivers/pwm.s`**:
+  - *Purpose*: Hardware Timer PWM driver.
+  - *Logic*: Sets up `TIM3` and `TIM4` registers to output PWM waveforms for the positional medicine servo and motor speed controllers.
+
+- **`Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`**:
+  - *Purpose*: USART2 driver and ring buffers.
+  - *Logic*: Configures `PA2` (TX) and `PA3` (RX) to alternate functions. It implements non-blocking serial communication using USART interrupts and circular ring buffers in RAM.
+
+- **`Drivers/buzzer.s`**:
+  - *Purpose*: Beeper driver on `PB4`.
+  - *Logic*: Manages periodic buzzer beeps during active alarm states.
+
+- **`Drivers/tft_low.s`**:
+  - *Purpose*: ILI9341 register and SPI1 driver.
+  - *Logic*: Configures `PB0` (CS), `PB1` (DC), `PB2` (RST), and SPI1 alternate function pins (`PB3`/`PB5`). It configures the SPI1 register block, manages command and data modes, and initializes the ILI9341 3.2" display.
+
+- **`Drivers/tft_gfx.s`**:
+  - *Purpose*: Custom 2D graphics rendering engine.
+  - *Logic*: Defines subroutines to clear the screen, define active pixel coordinate windows, fill rectangular blocks, render ASCII characters using custom font arrays, plot coordinate vectors, and draw real-time scrolling wave graphs.
+
+- **`motion.s` (Root File)**:
+  - *Purpose*: Unified motor guidance manager.
+  - *Logic*: Reads the line tracking sensor array, determines direction adjustments using a decision tree, and controls motor inputs. It also implements safety checks that stop the robot if an obstacle is detected within $15\text{cm}$ or when bedside call beacons are aligned.
 
 ---
 
@@ -842,212 +884,558 @@ Below is the implementation matrix for the robot's active features, detailing bo
 
 ### 1. Heart Rate & SpO₂ Monitor (MAX30102)
 
-*   **Metaphor (ELIF5)**: When your heart beats, blood rushes through your finger and absorbs light. The oximeter sensor shines red and infrared lights into your skin to count how fast your pulse is going and see how clean your blood oxygen is!
-*   **Detailed Collaboration & Implementation**:
-    *   **I2C Layer (`Drivers/i2c.s`)**: Handles hardware register communication over open-drain pins `PB8` (SCL) and `PB9` (SDA) with a standard 100 kHz transmission clock. It manages I2C transaction protocols: generating start, write-address (`0x57` device LSB=0), sub-register write, read-address (LSB=1), repeated start, ACK, NACK, and STOP conditions.
-    *   **Configuration & Filtering (`features/max.s`)**:
-        *   Initializes the MAX30102 by writing `MODE_RESET = 0x40` to register `0x09` (`REG_MODE_CFG`), disabling interrupts, clearing FIFO pointers, configuring SpO₂ mode, and setting both LED currents to `1Fh` (approx. 6.4mA).
-        *   Polls the FIFO pointers (`REG_FIFO_WR_PTR = 0x04` and `REG_FIFO_RD_PTR = 0x06`) to check for new samples. If a sample exists, it executes a 6-byte burst read of `REG_FIFO_DATA = 0x07` to retrieve raw Red and Infrared channel readings.
-        *   Implements an infinite impulse response (IIR) **DC Removal Filter** to isolate the AC heart signal for screen plotting:
-            $$\text{DC}(n) = \text{DC}(n-1) + \frac{\text{Raw}(n) - \text{DC}(n-1)}{16}$$
-            $$\text{AC}(n) = \text{Raw}(n) - \text{DC}(n)$$
-            The AC signal is offset by $+2000$ to maintain positive values and stored in `g_hr_ac_val` for real-time scrolling wave drawing on the TFT.
-        *   Implements finger detection: if the raw IR value falls below `40,000` counts, it flags "No Finger" and zeroes the outputs.
-        *   Calculates BPM and SpO₂: BPM is mapped to a diagnostic range of $70 \text{ to } 101 \text{ bpm}$ based on the Red raw values. SpO₂ is calculated by taking the ratio of Red and Infrared AC/DC components:
-            $$\text{Ratio} = \frac{\text{Red}_{\text{AC}} / \text{Red}_{\text{DC}}}{\text{IR}_{\text{AC}} / \text{IR}_{\text{DC}}}$$
-            This ratio is scaled and clamped to output a value between $70\% \text{ and } 100\%$ to `g_spo2` in RAM.
-    *   **Scheduler (`core/main.s`)**: Invokes `HR_ReadFIFO` inside the super-loop execution cycle.
-    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders numeric BPM and SpO₂ digits, and draws real-time scrolling raw PPG waves on the TFT.
+**Metaphor (ELI5):** When your heart beats, blood rushes through your finger and absorbs light. The oximeter sensor shines red and infrared lights into your skin to count how fast your pulse is going and see how clean your blood oxygen is!
+
+**Detailed Implementation:**
+
+- **I2C Layer (`Drivers/i2c.s`)**: Handles hardware register communication over open-drain pins `PB8` (SCL) and `PB9` (SDA) with a standard 100 kHz transmission clock. It manages I2C transaction protocols: generating start, write-address (0x57 device LSB=0), sub-register write, read-address (LSB=1), repeated start, ACK, NACK, and STOP conditions.
+- **Configuration & Filtering (`features/max.s`)**:
+  - Initializes the MAX30102 by writing `MODE_RESET = 0x40` to register `0x09` (`REG_MODE_CFG`), disabling interrupts, clearing FIFO pointers, configuring SpO₂ mode, and setting both LED currents to `1Fh` (approx. 6.4mA).
+  - Polls the FIFO pointers (`REG_FIFO_WR_PTR = 0x04` and `REG_FIFO_RD_PTR = 0x06`) to check for new samples. If a sample exists, it executes a 6-byte burst read of `REG_FIFO_DATA = 0x07` to retrieve raw Red and Infrared channel readings.
+  - Implements an IIR DC Removal Filter to isolate the AC heart signal for screen plotting:
+    $$DC(n) = DC(n-1) + \frac{Raw(n) - DC(n-1)}{16}$$
+    $$AC(n) = Raw(n) - DC(n)$$
+    The AC signal is offset by +2000 to maintain positive values and stored in `g_hr_ac_val` for real-time scrolling wave drawing on the TFT.
+  - Implements finger detection: if the raw IR value falls below 40,000 counts, it flags "No Finger" and zeroes the outputs.
+  - Calculates BPM and SpO₂: BPM is mapped to a diagnostic range of 70 to 101 bpm based on the Red raw values. SpO₂ is calculated by taking the ratio of Red and Infrared AC/DC components:
+    $$\text{Ratio} = \frac{Red_{AC} / Red_{DC}}{IR_{AC} / IR_{DC}}$$
+    This ratio is scaled and clamped to output a value between 70% and 100% to `g_spo2` in RAM.
+- **Scheduler (`core/main.s`)**: Invokes `HR_ReadFIFO` inside the super-loop execution cycle.
+- **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders numeric BPM and SpO₂ digits, and draws real-time scrolling raw PPG waves on the TFT.
 
 ---
 
 ### 2. Breathing Waveform Monitor
 
-*   **Metaphor (ELIF5)**: Think of this as drawing a wave line on a chalkboard that tracks your breathing. To prevent the line from drifting off the board, a helper calculates the average room temperature (baseline) and automatically centers the drawing line.
-*   **Detailed Collaboration & Implementation**:
-    *   **ADC Driver (`Drivers/adc.s`)**: Samples the analog thermistor/respiratory flow sensor connected to `PA0` (ADC Channel 0) at a resolution of 12 bits ($0 \text{ to } 4095$ range).
-    *   **Signal Processing (`features/breathing.s`)**:
-        *   Restricts update tasks to a stable $40\text{ Hz}$ ($25\text{ms}$ refresh cycle) by comparing the uptime ticks in `g_ms_ticks`.
-        *   On startup, initializes baseline and filter registers with the first raw sensor sample.
-        *   Implements a slow baseline tracking filter to eliminate temperature drift:
-            $$\text{Baseline}(n) = \text{Baseline}(n-1) + \frac{\text{Raw}(n) - \text{Baseline}(n-1)}{64}$$
-        *   Calculates the centered AC breathing level by subtracting the baseline from the raw reading and amplifying the variance by 8:
-            $$\text{AC}_{\text{unfiltered}} = (\text{Raw}(n) - \text{Baseline}(n)) \times 8$$
-            This value is clamped within $[-1024, +1024]$ to prevent overflow.
-        *   Smoothes out high-frequency noise using a low-pass filter:
-            $$\text{Filtered}(n) = \text{Filtered}(n-1) + \frac{\text{AC}_{\text{unfiltered}}(n) - \text{Filtered}(n-1)}{4}$$
-        *   Shifts the smoothed AC signal to center around a baseline offset of `2048` and stores the final result in `g_breath_level` in RAM.
-    *   **Scheduler (`core/main.s`)**: Executes `BREATHE_Update` repeatedly in the scheduler.
-    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Draws the scrolling waveform of `g_breath_level` relative to the screen height.
+**Metaphor (ELI5):** Think of this as drawing a wave line on a chalkboard that tracks your breathing. To prevent the line from drifting off the board, a helper calculates the average (baseline) and automatically centers the drawing line.
+
+**Detailed Implementation:**
+
+- **ADC Driver (`Drivers/adc.s`)**: Samples the analog respiratory flow sensor connected to `PA0` (ADC Channel 0) at a resolution of 12 bits (0 to 4095 range).
+- **Signal Processing (`features/breathing.s`)**:
+  - Restricts update tasks to a stable 40 Hz (25ms refresh cycle) by comparing uptime ticks in `g_ms_ticks`.
+  - On startup, initializes baseline and filter registers with the first raw sensor sample.
+  - Implements a slow baseline tracking filter to eliminate drift:
+    $$Baseline(n) = Baseline(n-1) + \frac{Raw(n) - Baseline(n-1)}{64}$$
+  - Calculates the centered AC breathing level by subtracting the baseline and amplifying by 8:
+    $$AC_{unfiltered} = (Raw(n) - Baseline(n)) \times 8$$
+    This value is clamped within $[-1024, +1024]$ to prevent overflow.
+  - Smoothes out high-frequency noise using a low-pass filter:
+    $$Filtered(n) = Filtered(n-1) + \frac{AC_{unfiltered}(n) - Filtered(n-1)}{4}$$
+  - Shifts the smoothed AC signal to center around a baseline offset of 2048 and stores the final result in `g_breath_level` in RAM.
+- **Scheduler (`core/main.s`)**: Executes `BREATHE_Update` repeatedly in the scheduler.
+- **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Draws the scrolling waveform of `g_breath_level` relative to the screen height.
 
 ---
 
 ### 3. Volatility Stress Index
 
-*   **Metaphor (ELIF5)**: When you are calm, your heart beats steadily. When you are excited or stressed, your heart rate increases. This script calculates how high your heart rate is compared to resting, and adds micro-movements on the screen to show live feedback.
-*   **Detailed Collaboration & Implementation**:
-    *   **Data Source (`features/max.s`)**: Obtains live heart rate values from `g_bpm`.
-    *   **Stress Analysis (`features/stress.s`)**:
-        *   Calculates stress index using the mathematical relationship:
-            $$\text{Stress Score} = (\text{BPM} - 60) \times 2$$
-        *   If the calculated score is negative (BPM is below 60), it defaults to 0.
-        *   Limits the maximum stress score to `100` to prevent chart overflows.
-    *   **Jitter Injection (`core/ui_state.s`)**: Reads the millisecond counter `g_ms_ticks` to inject a $0\text{--}3\%$ variation mask (`g_ms_ticks & 3`) to the displayed volatility score, simulating real-life sensor jitter and keeping the TFT interface visually dynamic.
-    *   **Visual Interface (`Drivers/tft_gfx.s`)**: Renders the stress level as an animated bar gauge alongside warning tags.
+**Metaphor (ELI5):** When you are calm, your heart beats steadily. When you are excited or stressed, your heart rate increases. This script calculates how high your heart rate is compared to resting, and adds micro-movements on the screen to show live feedback.
+
+**Detailed Implementation:**
+
+- **Data Source (`features/max.s`)**: Obtains live heart rate values from `g_bpm`.
+- **Stress Analysis (`features/stress.s`)**:
+  - Calculates the stress index using the mathematical relationship:
+    $$\text{Stress Score} = (BPM - 60) \times 2$$
+  - If the calculated score is negative (BPM is below 60), it defaults to 0.
+  - Limits the maximum stress score to 100 to prevent chart overflows.
+- **Jitter Injection (`core/ui_state.s`)**: Reads the millisecond counter `g_ms_ticks` to inject a 0–3% variation mask (`g_ms_ticks & 3`) to the displayed volatility score, simulating real-life sensor jitter and keeping the TFT interface visually dynamic.
+- **Visual Interface (`Drivers/tft_gfx.s`)**: Renders the stress level as an animated bar gauge alongside warning tags.
 
 ---
 
 ### 4. Sub-Dermal Vein Finder
 
-*   **Metaphor (ELIF5)**: Veins look like dark underground rivers under our skin. The robot shines an invisible flashlight (infrared) down. If it finds a river (vein), it absorbs the light, making the robot beep faster the closer it gets to the center.
-*   **Detailed Collaboration & Implementation**:
-    *   **ADC Driver (`Drivers/adc.s`)**: Configures `PA7` (ADC Channel 7) for analog sensing. It writes to the `ADC_SMPR2` register to apply an extended **480 clock cycle** sampling time, stabilizing reading acquisitions and filtering out high-impedance optical noise.
-    *   **Signal Processing (`features/vein.s`)**:
-        *   Performs an 8-sample moving average filter on the raw ADC value to eliminate high-frequency ripple.
-        *   On startup, records a baseline value over the first 128 samples to calibrate individual skin reflectance.
-        *   Calculates the relative sub-dermal absorption:
-            $$\text{Absorption} = \text{Baseline} - \text{Averaged\_Readings}$$
-    *   **Audio Modulation (`Drivers/buzzer.s`)**:
-        *   Maps the absorption level to a dynamic beep interval. 
-        *   When absorption is high (indicative of a sub-dermal blood vessel absorbing IR light), the beep interval decreases down to a solid tone to guide needle insertion.
-    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Graphs the absorption intensity as a live horizontal scrolling wave.
+**Metaphor (ELI5):** Veins look like dark underground rivers under our skin. The robot shines an invisible flashlight (infrared) down. If it finds a river (vein), it absorbs the light, making the robot beep faster the closer it gets to the center.
+
+**Detailed Implementation:**
+
+- **ADC Driver (`Drivers/adc.s`)**: Configures `PA7` (ADC Channel 7) for analog sensing. Writes to the `ADC_SMPR2` register to apply an extended **480 clock cycle** sampling time, stabilizing reading acquisitions and filtering out high-impedance optical noise.
+- **Signal Processing (`features/vein.s`)**:
+  - Performs an **8-sample moving average filter** on the raw ADC value to eliminate high-frequency ripple.
+  - On startup, records a baseline value over the **first 128 samples** to calibrate individual skin reflectance.
+  - Calculates the relative sub-dermal absorption:
+    $$\text{Absorption} = \text{Baseline} - \text{Averaged\_Readings}$$
+- **Audio Modulation (`Drivers/buzzer.s`)**: Maps the absorption level to a dynamic beep interval. When absorption is high (indicative of a sub-dermal blood vessel absorbing IR light), the beep interval decreases down to a solid tone to guide needle insertion.
+- **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Graphs the absorption intensity as a live horizontal scrolling wave.
 
 ---
 
 ### 5. Body Temperature Monitor
 
-*   **Metaphor (ELIF5)**: This is a digital thermometer that reads your body temperature and splits it into a whole number (like 37) and a fraction (like .5) to show on the screen.
-*   **Detailed Collaboration & Implementation**:
-    *   **I2C Layer (`Drivers/i2c.s`)**: Performs reads and writes on the MAX30102 temperature registers.
-    *   **Acquisition (`features/max.s`)**:
-        *   Initiates a temperature conversion by writing `0x01` to `REG_TEMP_CONFIG = 0x21`.
-        *   Spins in a watchdog-guarded timeout loop (40,000 counts) checking for the conversion bit to clear.
-        *   Reads the signed integer byte from `REG_TEMP_INTR = 0x1F` and stores it to `g_temp_int`.
-        *   Reads the fractional part (4-bit resolution, each step representing $0.0625^{\circ}\text{C}$) from `REG_TEMP_FRAC = 0x20`, masking with `0x0F` and storing the decimal coefficient to `g_temp_frac`.
-    *   **Scheduler (`core/main.s`)**: Triggers `HR_ReadTemp` conversions every $500\text{ms}$.
-    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders decimal readouts on the display.
+**Metaphor (ELI5):** This is a digital thermometer that reads your body temperature and splits it into a whole number (like 37) and a fraction (like .5) to show on the screen.
+
+**Detailed Implementation:**
+
+- **I2C Layer (`Drivers/i2c.s`)**: Performs reads and writes on the MAX30102 temperature registers.
+- **Acquisition (`features/max.s`)**:
+  - Initiates a temperature conversion by writing `0x01` to `REG_TEMP_CONFIG = 0x21`.
+  - Spins in a watchdog-guarded timeout loop (40,000 counts) checking for the conversion bit to clear.
+  - Reads the signed integer byte from `REG_TEMP_INTR = 0x1F` and stores it to `g_temp_int`.
+  - Reads the fractional part (4-bit resolution, each step representing 0.0625°C) from `REG_TEMP_FRAC = 0x20`, masking with `0x0F` and storing the decimal coefficient to `g_temp_frac`.
+- **Scheduler (`core/main.s`)**: Triggers `HR_ReadTemp` conversions every 500ms.
+- **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders decimal readouts on the display.
 
 ---
 
 ### 6. Servo Medication Dispenser
 
-*   **Metaphor (ELIF5)**: The robot acts like a smart pillbox. You set a timer, and when it runs out, the robot rings a bell (buzzer) and turns a wheel (servo) to drop a pill into your hand!
-*   **Detailed Collaboration & Implementation**:
-    *   **State Machine (`core/ui_state.s`)**: Captures keypad inputs to decrement or increment medication wait times, stored in `g_med_timer`.
-    *   **Background Timer (`features/medicine.s`)**: Compares current SysTick values against `g_ms_ticks` to handle background seconds countdown. When `g_med_timer` reaches 0, it triggers a global alarm flag `Med_Alert_Flag` in `g_alarm_flags`.
-    *   **PWM Driver (`Drivers/pwm.s`)**:
-        *   Configures `TIM3` on `PA6` for 50Hz PWM output (prescaler 15, ARR 19999).
-        *   Adjusts duty cycle pulse widths via `TIM3_CCR1`:
-            *   `500 µs` ($0.5\text{ms}$ / $2.5\%$ duty) -> $0^{\circ}$ (holding position).
-            *   `1500 µs` ($1.5\text{ms}$ / $7.5\%$ duty) -> $90^{\circ}$ (medication dropped).
-            *   `2500 µs` ($2.5\text{ms}$ / $12.5\%$ duty) -> $180^{\circ}$ (sweep complete).
-    *   **Buzzer & Alarm Control (`Drivers/buzzer.s` & `core/main.s`)**: Sound alerts and wait for user confirmation inputs before returning the servo to the holding position.
+**Metaphor (ELI5):** The robot acts like a smart pillbox. You set a timer, and when it runs out, the robot rings a bell (buzzer) and turns a wheel (servo) to drop a pill into your hand!
+
+**Detailed Implementation:**
+
+- **State Machine (`core/ui_state.s`)**: Captures keypad inputs to decrement or increment medication wait times, stored in `g_med_timer`.
+- **Background Timer (`features/medicine.s`)**: Compares current SysTick values against `g_ms_ticks` to handle background seconds countdown. When `g_med_timer` reaches 0, it triggers a global alarm flag `Med_Alert_Flag` in `g_alarm_flags`.
+- **PWM Driver (`Drivers/pwm.s`)**: Configures TIM3 on `PA6` for 50Hz PWM output (prescaler 15, ARR 19999). Adjusts duty cycle pulse widths via `TIM3_CCR1`:
+  - 500 µs (0.5ms / 2.5% duty) → 0° (holding position)
+  - 1500 µs (1.5ms / 7.5% duty) → 90° (medication dropped)
+  - 2500 µs (2.5ms / 12.5% duty) → 180° (sweep complete)
+- **Buzzer & Alarm Control (`Drivers/buzzer.s` & `core/main.s`)**: Sounds alerts and waits for user confirmation inputs before returning the servo to the holding position.
 
 ---
 
 ### 7. Environmental Smoke Alert
 
-*   **Metaphor (ELIF5)**: If the robot smells smoke, it counts to 15 to make sure it's not just a false alarm (like a blown candle), then sounds a fire alarm and switches the screen to a warning display.
-*   **Detailed Collaboration & Implementation**:
-    *   **ADC Driver (`Drivers/adc.s`)**: Configures `PA1` (ADC Channel 1) for the MQ-2 sensor. Configures the hardware **Analog Watchdog (AWD)** to trigger the high-priority `ADC_IRQHandler` (IRQ 18) when readings exceed the upper threshold (`HTR = 3000`).
-    *   **Sensor Warmup & Verification (`features/smoke.s`)**:
-        *   Implements a 30-second startup delay (150 readings) to allow the MQ-2 heating element to stabilize before checking alarm flags.
-        *   Implements a debounce filter requiring **15 consecutive samples** above threshold over 3 seconds to prevent false alarms.
-    *   **Audio Modulation (`Drivers/buzzer.s`)**: Drives continuous alert beeps on `PB4` until smoke concentration drops below `2000`.
-    *   **Visual Interface (`core/ui_state.s`)**: Sets `Smoke_Alert_Flag` in `g_alarm_flags`, overriding the active screen to render a red flashing "SMOKE ALERT - DANGER" warning.
+**Metaphor (ELI5):** If the robot smells smoke, it counts to 15 to make sure it's not just a false alarm (like a blown candle), then sounds a fire alarm and switches the screen to a warning display.
+
+**Detailed Implementation:**
+
+- **ADC Driver (`Drivers/adc.s`)**: Configures `PA1` (ADC Channel 1) for the MQ-2 sensor. Configures the hardware Analog Watchdog (AWD) to trigger the high-priority `ADC_IRQHandler` (IRQ 18) when readings exceed the upper threshold (`HTR = 3000`).
+- **Sensor Warmup & Verification (`features/smoke.s`)**:
+  - Implements a **30-second startup delay** (150 readings) to allow the MQ-2 heating element to stabilize before checking alarm flags.
+  - Implements a debounce filter requiring **15 consecutive samples** above threshold over 3 seconds to prevent false alarms.
+- **Audio Modulation (`Drivers/buzzer.s`)**: Drives continuous alert beeps on `PB4` until smoke concentration drops below 2000.
+- **Visual Interface (`core/ui_state.s`)**: Sets `Smoke_Alert_Flag` in `g_alarm_flags`, overriding the active screen to render a red flashing "SMOKE ALERT - DANGER" warning.
 
 ---
 
 ### 8. IR Hand Sanitizer
 
-*   **Metaphor (ELIF5)**: When you place your hand under the sensor, it blocks a light beam. The robot detects this and turns on a pump to dispense sanitizer, then turns it off.
-*   **Detailed Collaboration & Implementation**:
-    *   **State Machine (`features/santizing.s`)**:
-        *   Polls the active-low proximity sensor connected to `PA4` using `GPIO_ReadPin`.
-        *   If a hand is detected (`PA4 == 0`), it pulls the relay pump output `PA5` **HIGH** to start the gel pump.
-        *   Runs a software delay loop to keep the pump active for exactly 1.5 seconds.
-        *   Pulls `PA5` **LOW** to stop the pump, preventing gel leakage.
-        *   Enforces a mandatory 2-second cooldown delay before another dose can be dispensed.
+**Metaphor (ELI5):** When you place your hand under the sensor, it blocks a light beam. The robot detects this and turns on a pump to dispense sanitizer, then turns it off.
+
+**Detailed Implementation:**
+
+- **State Machine (`features/santizing.s`)**:
+  - Polls the active-low proximity sensor connected to `PA4` using `GPIO_ReadPin`.
+  - If a hand is detected (`PA4 == 0`), it pulls the relay pump output `PA5` HIGH to start the gel pump.
+  - Runs a software delay loop to keep the pump active for exactly 1.5 seconds.
+  - Pulls `PA5` LOW to stop the pump, preventing gel leakage.
+  - Enforces a mandatory **2-second cooldown delay** before another dose can be dispensed.
 
 ---
 
 ### 9. Landolt C Vision Test
 
-*   **Metaphor (ELIF5)**: The robot displays a circle with a small gap on the screen (like a letter "C"). You press arrow buttons on the remote to point to where the gap is. If you get it right, the circle gets smaller and smaller!
-*   **Detailed Collaboration & Implementation**:
-    *   **IR Receiver (`Drivers/ir_driver.s`)**: Decodes directional remote keys (`KEY_UP`/`KEY_DOWN`/`KEY_LEFT`/`KEY_RIGHT`) via falling-edge interrupts on `PB10`.
-    *   **Test Management (`core/ui_state.s`)**:
-        *   Generates a randomized gap orientation (Up, Down, Left, or Right) using the lowest bits of `g_ms_ticks`.
-        *   Decreases the size of the Landolt C ring by reducing the drawing radius on successive correct answers.
-        *   Tracks test scores and calculates the corresponding Snellen visual acuity fraction (ranging from `< 6/60` up to `6/6`).
-    *   **Graphics Engine (`Drivers/tft_gfx.s`)**: Renders the high-contrast Landolt C optotypes on the LCD.
+**Metaphor (ELI5):** The robot displays a circle with a small gap on the screen (like a letter "C"). You press arrow buttons on the remote to point to where the gap is. If you get it right, the circle gets smaller and smaller!
+
+**Detailed Implementation:**
+
+- **IR Receiver (`Drivers/ir_driver.s`)**: Decodes directional remote keys (`KEY_UP`/`KEY_DOWN`/`KEY_LEFT`/`KEY_RIGHT`) via falling-edge interrupts on `PB10`.
+- **Test Management (`core/ui_state.s`)**:
+  - Generates a randomized gap orientation (Up, Down, Left, or Right) using the lowest bits of `g_ms_ticks`.
+  - Decreases the size of the Landolt C ring by reducing the drawing radius on successive correct answers.
+  - Tracks test scores and calculates the corresponding Snellen visual acuity fraction (ranging from < 6/60 up to 6/6).
+- **Graphics Engine (`Drivers/tft_gfx.s`)**: Renders the high-contrast Landolt C optotypes on the LCD.
 
 ---
 
 ### 10. Autonomous Line-Tracking Guidance
 
-*   **Metaphor (ELIF5)**: The robot acts like a toy train on a track. It uses three light sensors underneath to watch the floor. If it drifts too far left or right, it adjusts its wheels to stay on the line. If it loses the line entirely, it remembers where it last saw it and turns back!
-*   **Detailed Collaboration & Implementation**:
-    *   **Sensor Reading (`core/gpio.s`)**: Configures `PB12` (Left), `PB15` (Center), and `PB14` (Right) as digital inputs.
-    *   **Guidance Control (`motion.s`)**:
-        *   Polls sensor inputs, combines them into a 3-bit mask, and inverts it (`EOR R7, R7, #7`) to correct for active-low outputs.
-        *   Uses a decision tree to adjust steering: center sensors on line drive straight; side sensors trigger arc turns.
-        *   **Memory Rescue Logic:** Tracks the steering history using `Last_Turn`. If the line is lost (`000` mask), it executes a hard tank spin in the direction it last saw the line.
-    *   **Safety Overrides (`features/ultrasonic.s`)**: Reads obstacle distance from the HC-SR04 sonar. If an obstacle is detected within $15\text{ cm}$, it overrides all mode tasks to stop the motors.
-    *   **DC Motor Control (`Drivers/pwm.s`)**: Drives `TIM4` registers to output PWM duty cycles (prescaler 15, ARR 999) to control wheel velocity.
+**Metaphor (ELI5):** The robot acts like a toy train on a track. It uses three light sensors underneath to watch the floor. If it drifts too far left or right, it adjusts its wheels to stay on the line. If it loses the line entirely, it remembers where it last saw it and turns back!
+
+#### Low-Level Sensor Port Reading & Bitmask Assembly
+
+The line tracking array consists of 3 IR sensors mounted underneath the chassis pointing to the floor, connected as inputs to Port B:
+- **Left Sensor:** `PB12` (`LINE_LEFT`)
+- **Center Sensor:** `PB15` (`LINE_CENTER`)
+- **Right Sensor:** `PB14` (`LINE_RIGHT`)
+
+The main guidance loop reads these pins individually using `GPIO_ReadPin`, shifts them into position, and combines them into a single 3-bit status mask:
+
+```assembly
+; Read and shift Left (bit 2), Center (bit 1), and Right (bit 0)
+LDR     R0, =GPIOB_BASE
+MOV     R1, #LINE_LEFT
+BL      GPIO_ReadPin
+LSL     R4, R0, #2              ; Left shifted to bit 2
+
+LDR     R0, =GPIOB_BASE
+MOV     R1, #LINE_CENTER
+BL      GPIO_ReadPin
+LSL     R5, R0, #1              ; Center shifted to bit 1
+
+LDR     R0, =GPIOB_BASE
+MOV     R1, #LINE_RIGHT
+BL      GPIO_ReadPin
+MOV     R6, R0                  ; Right stays at bit 0
+
+ORR     R7, R4, R5
+ORR     R7, R7, R6
+EOR     R7, R7, #7              ; Invert 3-bit mask (active-low correction)
+```
+
+> **The Active-Low Inversion Battle:** Most reflective sensors pull their digital outputs **LOW** when they detect a black line (absorbing infrared) and **HIGH** when on the white floor (reflecting infrared). To make the decision tree readable and intuitive, the code uses `EOR R7, R7, #7` to invert the 3-bit mask. After inversion: `1` = Sensor is active over the **black line**, `0` = Sensor is active over the **white floor**.
+
+#### The Decision Tree State Machine
+
+The inverted 3-bit mask in `R7` represents the position of the black line relative to the robot's center. The controller evaluates this state using a static branching tree:
+
+| Inverted Mask (`R7`) | Binary | Sensors Over Line | Target Movement | Action Taken |
+| :---: | :---: | :---: | :---: | :---: |
+| `0x02` | `010` | Center | Drive Straight | Forward, Left=340, Right=340 |
+| `0x05` | `101` | Left & Right | Drive Straight (Junction) | Forward, Left=340, Right=340 |
+| `0x04` | `100` | Left | Steer Left (Arc) | Forward, Left=480, Right=280 |
+| `0x06` | `110` | Left & Center | Steer Left (Arc) | Forward, Left=480, Right=280 |
+| `0x01` | `001` | Right | Steer Right (Arc) | Forward, Left=290, Right=480 |
+| `0x03` | `011` | Right & Center | Steer Right (Arc) | Forward, Left=290, Right=480 |
+| `0x07` | `111` | All Three | T-Junction / Stop | Halt motors (Left=0, Right=0) |
+| `0x00` | `000` | None | Line Lost (Rescue) | Jump to Memory Rescue |
+
+#### Memory Rescue Logic (Handling Sharp 90° Corners & Overshoots)
+
+When the robot moves too fast or encounters a sharp $90^{\circ}$ turn, it temporarily overshoots the line. At this instant, the sensors read `000` (all sensors over white floor). Without state memory, the robot would continue driving straight into the wall or spin randomly.
+
+To solve this, the driver uses a global variable `Last_Turn` saved in RAM:
+- `0` = Last moving straight.
+- `1` = Last steered left.
+- `2` = Last steered right.
+
+Whenever the line is lost (`R7 == 0x00`), the `Rescue_Lost_Line` subroutine triggers:
+- If `Last_Turn == 1` (line lost while steering left): The robot initiates a high-torque, counter-rotational **Pivot Spin Left** (`Action_Pivot_Left`).
+- If `Last_Turn == 2` (line lost while steering right): The robot initiates a high-torque, counter-rotational **Pivot Spin Right** (`Action_Pivot_Right`).
+- This forces the robot to swing back onto the line in the exact direction it was lost, recovering automatically.
+
+#### Motor Actuation Details (H-Bridge Vectors & PWM Speeds)
+
+The robot uses two L298N-type motor drivers. Direction is controlled by GPIO outputs on Port A, while velocity is controlled by TIM4 PWM outputs on Port B.
+
+**H-Bridge Direction Vectors (PA8 to PA11):**
+- **Left Motor Control:** `MOT_IN1` (`PA8`), `MOT_IN2` (`PA9`)
+- **Right Motor Control:** `MOT_IN3` (`PA10`), `MOT_IN4` (`PA11`)
+
+```assembly
+; Forward Vector
+IN1=1, IN2=0, IN3=1, IN4=0   ; Both motors drive forward
+
+; Backward Vector
+IN1=0, IN2=1, IN3=0, IN4=1   ; Both motors drive backward
+
+; Tank Spin Left Vector
+IN1=1, IN2=0, IN3=0, IN4=1   ; Left motor forward, Right motor backward
+
+; Tank Spin Right Vector
+IN1=0, IN2=1, IN3=1, IN4=0   ; Left motor backward, Right motor forward
+```
+
+**PWM Velocity Control (TIM4 CH1 & CH2 on PB6/PB7):**
+
+The timer auto-reload register (`ARR`) is set to `999` to produce a $1\text{ kHz}$ carrier frequency. Speeds are mapped into the Capture/Compare registers (`TIM4_CCR1` and `TIM4_CCR2`):
+- **Straight:** Left = `340`, Right = `340` (balanced forward cruising)
+- **Arc Left:** Left = `480`, Right = `280` (asymmetrical drift to correct rightward error)
+- **Arc Right:** Left = `290`, Right = `480` (asymmetrical drift to correct leftward error)
+- **Pivot Turn:** Left = `280`, Right = `280` (medium-speed opposite spin to search for the line)
+
+#### Bare-Metal Development Pain Points
+
+We spent countless debugging sessions solving two critical hardware issues in `motion.s`:
+
+**1. The 8-Byte Stack Alignment Hard Faults:**
+The ARM Cortex-M4 ABI enforces **8-byte stack alignment** at public function boundaries. Because helper functions like `Motion_Forward` call sub-routines (e.g. `GPIO_WritePin` and `PWM_Set_Motor_Speed`), pushing only a single register (`PUSH {LR}`) shifts the stack pointer (`SP`) by 4 bytes (odd-word alignment), resulting in immediate **Hard Faults** when nesting calls. The fix was to push a dummy register `R3` to align the stack:
+
+```assembly
+Motion_Forward
+        PUSH    {R3, LR}      ; R3 is a dummy push to align SP to 8 bytes!
+        ...
+        POP     {R3, PC}
+```
+
+**2. Arc Turn vs. Pivot Turn Speed Balancing:**
+During initial testing in simulation, if the arc speeds were too high, the robot would swing violently from side to side (oscillating out of control). If the speeds were too low, it stalled on turns. Similarly, pivot recovery spins required opposite wheel rotation at moderate speeds (`280` out of `999`) to prevent the robot from spinning past the line before the sensor polling task could capture the transition. The values (`480/280` for arcs, `280/280` for pivots) were manually calibrated through repeated iteration.
+
+**File Collaboration:**
+- `core/gpio.s`: Configures `PB12`, `PB15`, and `PB14` as digital inputs.
+- `motion.s`: Reads tracking inputs, processes `Last_Turn` memory states, and stops if the ultrasonic sensor registers an obstacle within $15\text{ cm}$.
+- `Drivers/pwm.s`: Directs `TIM4` registers to output correct PWM speeds to the DC motors.
 
 ---
 
 ### 11. Mobile App Bluetooth Override
 
-*   **Metaphor (ELIF5)**: Usually, the robot drives itself. But if you connect your phone over Bluetooth, you can drive it like a remote-controlled car! If you close the app, the robot safely stops and goes back to tracking the line.
-*   **Detailed Collaboration & Implementation**:
-    *   **Serial Buffer (`Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`)**: Sets up USART2 on `PA2`/`PA3` to receive joystick inputs. Fills a circular ring buffer in the background using RXNE interrupts.
-    *   **Command Parsing (`features/motion_bt.s`)**:
-        *   Searches the buffer for motion commands (`FWD`, `BACK`, `LEFT`, `RIGHT`, `STOP`).
-        *   Sets manual override flags and resets a 2-second timeout watchdog on each new packet.
-    *   **Override Logic (`motion.s`)**: If the manual flag is set, it bypasses autonomous line tracking to execute Bluetooth steering commands. If the 2-second timeout expires, it halts the robot and returns to autonomous line-tracking mode.
+**Metaphor (ELI5):** Usually, the robot drives itself. But if you connect your phone over Bluetooth, you can drive it like a remote-controlled car! If you close the app, the robot safely stops and goes back to tracking the line.
+
+**Detailed Implementation:**
+
+- **Serial Buffer (`Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`)**: Sets up USART2 on `PA2/PA3` to receive joystick inputs. Fills a circular ring buffer in the background using RXNE interrupts.
+- **Command Parsing (`features/motion_bt.s`)**: Searches the buffer for motion commands (FWD, BACK, LEFT, RIGHT, STOP). Sets manual override flags and resets a 2-second timeout watchdog on each new packet.
+- **Override Logic (`motion.s`)**: If the manual flag is set, it bypasses autonomous line tracking to execute Bluetooth steering commands. If the 2-second timeout expires, it halts the robot and returns to autonomous line-tracking mode.
 
 ---
 
 ### 12. Bedside IR Station Call-Docking Feature
 
-*   **Metaphor (ELIF5)**: Imagine the robot is a mail carrier. When a patient clicks a calling button at their bedside, it turns on an invisible beacon (Infrared light). The robot is drawn to this light, navigates to the bedside, and stops to deliver medication.
-*   **Detailed Collaboration & Implementation**:
-    *   **Input Pin (`core/gpio.s`)**: Configures `PB13` (`STATION_IR_PIN`) as a digital input.
-    *   **Debounced Reading (`features/ir_stations.s`)**:
-        *   Polls `PB13` and inverts the active-low signal (`EOR R0, R0, #1`).
-        *   Implements a 5-cycle consecutive read debounce filter. If 5 consecutive readings differ from the current state, it updates `g_station_detected`.
-    *   **Chassis Halt (`motion.s`)**: Checks the status of `g_station_detected`. If active (alignment beacon detected), the guidance loop calls `MOT_StopNow` to halt the DC motors, docking the robot at the patient's bedside.
+**Metaphor (ELI5):** Imagine the robot is a mail carrier. When a patient clicks a calling button at their bedside, it turns on an invisible beacon (Infrared light). The robot is drawn to this light, navigates to the bedside, and stops to deliver medication.
+
+**File Collaboration:**
+- `core/constants.s` & `core/gpio.s`: Configures pin `PB13` (`STATION_IR_PIN`) as a digital input.
+- `features/ir_stations.s`: Monitors sensor inputs on `PB13`. Inverts the active-low signal and runs a 5-cycle debounce filter to set `g_station_detected`.
+- `core/main.s`: Calls `StationIR_Update` on every super-loop cycle.
+- `motion.s`: Checks the status of `g_station_detected`. If active (alignment beacon detected), the guidance loop calls `MOT_StopNow` to halt the DC motors, docking the robot at the patient's bedside.
+
+---
+
+### 🔌 Bedside IR Beacon Selection Circuit — Hardware Deep Dive
+
+The challenge: a hospital ward may have **multiple bedsides**, but the robot must always dock at exactly **one** at a time. Rather than adding another microcontroller to arbitrate, a fully passive hardware circuit handles this using three inexpensive components.
+
+#### The Problem It Solves
+
+If two patients press their call buttons simultaneously, two IR beacons would emit at once. The robot's single IR receiver on `PB13` cannot tell them apart — it would detect a combined signal and navigate ambiguously between the two stations. The circuit ensures this situation is physically impossible: **only one IR transmitter can be powered at any moment**, regardless of how many buttons are pressed.
+
+#### Components
+
+| Component | Part | Role |
+|-----------|------|------|
+| **Latch push-buttons** | Momentary latching switches | Patient calls the robot by pressing and holding their bedside button |
+| **3-to-8 decoder** | 74HC238 | Converts the 3-bit binary station address into a single active output line |
+| **Isolation diodes** | Signal diodes (1N4148) | Prevent reverse current and cross-triggering between stations |
+| **IR LED transmitters** | 940nm IR LEDs | Emit the infrared beacon that the robot detects on `PB13` |
+
+#### How It Works — Step by Step
+
+**Step 1 — Patient presses a latch button.**
+Each bedside has a latching push-button. When pressed, it stores the call request mechanically (stays pressed until reset). The button outputs connect to the `A`, `B`, `C` select lines of the 74HC238 decoder, encoding which station is calling as a 3-bit binary number (Station 1 = `001`, Station 2 = `010`, Station 3 = `100`, etc.).
+
+**Step 2 — The 74HC238 decoder activates exactly one output.**
+The decoder reads the 3-bit address on its select lines and pulls exactly one of its eight outputs (Y0–Y7) HIGH. All other outputs remain LOW. This is the core hardware guarantee — the decoder's combinational logic makes it physically impossible for two outputs to be HIGH simultaneously for the same select combination. Additionally, when more than 1 button is pushed, a corresponding LED right beside the nurse will light up simultaneously, instantly alerting her that the robot is needed at that exact time.
+
+**Step 3 — Diode isolation routes power to one IR transmitter.**
+Each decoder output (`Y0`, `Y1`, `Y2`, `Y4`) connects to one IR LED transmitter (the rest — `Y3`, `Y5`, `Y6`, `Y7` — connect to regular LEDs) through a series diode. The diodes serve two purposes:
+- **Forward direction**: current flows from the active decoder output through the diode to power the IR LED.
+- **Reverse direction**: the diode blocks any back-current from flowing from one output into another, preventing cross-triggering where an active LED on Y1 could inadvertently feed current back into Y2's circuit.
+
+**Step 4 — The active IR beacon emits.**
+Only the one IR LED connected to the active decoder output has a complete current path and emits infrared light at 940nm. All other IR LEDs remain off.
+
+**Step 5 — The robot detects and docks.**
+The robot's `PB13` IR receiver module sees the single active beacon. `StationIR_Update` debounces the signal over 5 samples and sets `g_station_detected = 1`. The `motion.s` guidance loop calls `MOT_StopNow`, halting the robot precisely at that bedside station.
+
+#### Why This Design Was Chosen
+
+**No microcontroller needed.** The entire arbitration is handled combinationally by the 74HC238. This removes firmware complexity, eliminates interrupt latency, and reduces BOM cost significantly.
+
+**Deterministic priority.** If multiple buttons are pressed simultaneously, the 74HC238 selects based on the binary value present on its select lines (whichever button combination produces the lowest or highest address wins). This gives predictable, repeatable behavior in a multi-patient scenario.
+
+**Diodes as one-way valves.** The diode network is the safety layer. Without diodes, an active HIGH on `Y1` could flow backward through the IR LED of station 2 and into the `Y2` output pin of the decoder — potentially damaging the IC or falsely illuminating two LEDs. The diodes make each output's power path strictly one-directional.
+
+**Hospital-safe single-source guarantee.** The robot always has exactly one docking target. This prevents ambiguous navigation in multi-room environments and ensures medication is delivered to the correct patient.
+
+#### Circuit Truth Table (74HC238 select lines → active IR beacon)
+
+| Station | Button Address (C B A) | Active Decoder Output | IR Beacon |
+|---------|------------------------|----------------------|-----------|
+| Station 1 | `0 0 1` | Y1 | LED S1       ON |
+| Station 2 | `0 1 0` | Y2 | LED S2       ON |
+| Station 3 | `0 1 1` | Y3 | LED DUPLICATE ON |
+| Station 4 | `1 0 0` | Y4 | LED S3        ON |
+| Station 5 | `1 0 1` | Y5 | LED DUPLICATE ON |
+| Station 6 | `1 1 0` | Y6 | LED DUPLICATE ON |
+| Station 7 | `1 1 1` | Y7 | LED DUPLICATE ON |
+| Stand by  | `0 0 0` | Y0 | LED STANDBY   ON |
+
+#### Proteus Simulation
+
+> ![IR Station Alignment Hardware Simulation](imgs/ir_station_sim.jpg)
+>
+> **Figure:** Proteus simulation of the low-cost IR bedside selection circuit. Latch buttons feed the `A/B/C` select lines of the 74HC238 decoder. The single active output powers one IR LED through a diode, while all other LEDs remain off. The robot's receiver on `PB13` picks up the isolated beacon signal.
 
 ---
 
 ## 📱 Mobile App Control
 
-The robot can be driven manually via a custom **Robo Mobile App** that sends single-character Bluetooth commands over USART2 to the HC-05 module.
+The robot is controlled via the custom **RoboCare Mobile App** — a full-featured Android application for patient monitoring, robot motion control, and remote alert management over Bluetooth (HC-05 / USART2).
 
-![Robo App](imgs/app_screenshot.png)
+**[▶ Download RoboCare APK (Google Drive)](https://drive.google.com/file/d/1s6VO7PZKef49Cyw4DefM6DDQRT3lJbKn/view?usp=sharing)**
 
-**Bluetooth command map (parsed in `motion_bt.s`):**
+---
 
-| Char | Action |
-|------|--------|
-| `F` | Move Forward |
-| `B` | Move Backward |
-| `L` | Spin Left |
-| `R` | Spin Right |
-| `S` | Stop |
+### 📸 App Screenshots
 
-When a Bluetooth command arrives, it sets a manual override flag that suppresses autonomous line tracking for 2 seconds. If no new command arrives within that window, the robot automatically resumes autonomous mode.
+| Home Screen | Patient List | Vitals Dashboard | Motion Control |
+|:-----------:|:------------:|:----------------:|:--------------:|
+| ![Home Screen](imgs/app1.jpg) | ![Patient List](imgs/app2.jpg) | ![Vitals Dashboard](imgs/app3.jpg) | ![Motion Control](imgs/app4.jpg) |
 
-The USART2 interrupt fills a circular ring buffer (`bluetooth_buffer.s`) in the background. The main loop calls `BT_RxTask` once per cycle to drain the buffer without blocking.
+**Home Screen** — Connect to HC-05 via Bluetooth, navigate to Patients, Bluetooth settings, or Motion Control.
+
+**Patient List** — Add, edit, and delete patient profiles (name, ID, room number). Tap a patient to begin live monitoring.
+
+**Vitals Dashboard** — Live BPM, SpO₂, Breathing level, Smoke level, Medication timer, and Alert status updated every 250ms from the robot's USART2 vitals stream. Save readings to patient history.
+
+**Motion Control** — Full D-Pad joystick to drive the robot manually. Supports Forward, Backward, Left, Right, Stop, and toggle between Phone Control and autonomous Line Tracker mode.
+
+---
+
+### 🔑 App Features
+
+| Feature | Description |
+|---------|-------------|
+| **Bluetooth Connection** | Pair and connect to HC-05 module directly from the app |
+| **Patient Management** | Add, edit, and delete patient profiles (Name, ID, Room) |
+| **Live Vitals Dashboard** | Real-time BPM, SpO₂, Breath, Smoke level, Med timer, and Alert status |
+| **Save Readings** | Persist vitals snapshots per patient with history log |
+| **Motion Control** | D-Pad joystick to drive the robot (Forward, Back, Left, Right, Stop) |
+| **Phone / Line Mode** | Switch robot between manual phone control and autonomous line tracking |
+| **Remote Alert Dismiss** | Dismiss smoke and medication alerts over Bluetooth from the app |
+| **Virtual Keypad** | Send UI navigation keys (0–9, A–D, CAM_UP/DOWN/LEFT/RIGHT) to control all robot screens remotely |
+
+---
+
+### 📡 Bluetooth Command Protocol
+
+The app communicates with the robot over USART2 at **9600 baud** via the HC-05 module. Commands are plain ASCII strings terminated with `\r\n`.
+
+**Motion Commands** (parsed in `motion_bt.s` / `bluetooth.s`):
+
+| Command String | Action |
+|----------------|--------|
+| `DIR=FWD` | Move Forward |
+| `DIR=BACK` | Move Backward |
+| `DIR=LEFT` | Spin Left |
+| `DIR=RIGHT` | Spin Right |
+| `DIR=STOP` | Stop Motors |
+| `MODE=PHONE` | Enter manual phone-control mode |
+| `MODE=LINE` | Resume autonomous line tracking |
+| `OFF,SMOKE` | Dismiss active smoke alert |
+| `OFF,MED` | Dismiss active medication alert |
+
+**Virtual Keypad Commands** (parsed via `BT_Handle_UIKey` in `bluetooth.s`):
+
+| Command String | Key Injected | Effect |
+|----------------|-------------|--------|
+| `CMD=UI,KEY=0` … `KEY=9` | `KEY_0` … `KEY_9` | Navigate menus / select features |
+| `CMD=UI,KEY=A` … `KEY=D` | `KEY_A` … `KEY_D` | Function keys |
+| `CMD=UI,KEY=CAM_UP` | `KEY_UP` | D-Pad Up (Vision/Vein/Stress modes) |
+| `CMD=UI,KEY=CAM_DOWN` | `KEY_DOWN` | D-Pad Down |
+| `CMD=UI,KEY=CAM_LEFT` | `KEY_LEFT` | D-Pad Left |
+| `CMD=UI,KEY=CAM_RIGHT` | `KEY_RIGHT` | D-Pad Right |
+
+The `CAM_` prefix on directional keys ensures they **do not collide** with the robot's `DIR=LEFT/RIGHT` motion commands. The parser checks for `CMD=UI` first, routes through `BT_Handle_UIKey`, and stores the result in `g_bt_ui_key_request`. The main loop's `Main_ProcessBTKeyInjection` then writes this into `g_keycode` — making a virtual keypad press indistinguishable from a physical IR remote press.
+
+**Vitals Packet** (transmitted by the robot every 250ms):
+```
+TYPE=VITALS,PATIENT=001,BPM=72,SPO2=98,BREATH=1840,SMOKE=120,MED=300,ALERT=NONE\r\n
+```
+
+---
+
+### 🛠️ Assembly Integration: Bluetooth Virtual Keypad
+
+The virtual keypad required coordinated changes across three assembly files to safely inject app D-Pad inputs into the robot's UI state machine without disturbing the motion command pipeline.
+
+#### 1. `bluetooth_buffer.s` — New Global Variable
+
+```assembly
+; Add to EXPORT list:
+EXPORT  g_bt_ui_key_request
+
+; Add below g_bt_last_rx_tick:
+g_bt_ui_key_request        DCD     0    ; KEY_x value from CMD=UI,KEY=... (0=none)
+```
+
+#### 2. `bluetooth.s` — Parser Extension
+
+**New strings in `BT_RODATA`** (`CAM_` prefix prevents collision with `DIR=LEFT/RIGHT`):
+
+```assembly
+BT_TEXT_CMD_UI          DCB "CMD=UI",0
+BT_TEXT_KEY_PREFIX      DCB "KEY=",0
+BT_TEXT_KEY_UP          DCB "KEY=CAM_UP",0
+BT_TEXT_KEY_DOWN        DCB "KEY=CAM_DOWN",0
+BT_TEXT_KEY_LEFT        DCB "KEY=CAM_LEFT",0
+BT_TEXT_KEY_RIGHT       DCB "KEY=CAM_RIGHT",0
+BT_TEXT_KEY_0           DCB "KEY=0",0
+; ... KEY=1 through KEY=9, KEY=A through KEY=D
+```
+
+**`BT_ParseLine` — New check** (inserted after `MODE=LINE`, before `OFF`):
+
+```assembly
+; 8. Check for CMD=UI,KEY=... (virtual keypad injection)
+        LDR     R0, =bt_rx_buffer
+        LDR     R1, =BT_TEXT_CMD_UI
+        BL      BT_Contains
+        CMP     R0, #1
+        BEQ     BTP_UIKey
+
+BTP_UIKey
+        BL      BT_Handle_UIKey
+        BL      BT_QueueACK
+        B       BTP_Exit
+```
+
+**`BT_Handle_UIKey` subroutine** (place at the bottom of `bluetooth.s`, above `END`):
+
+Checks multi-char keys first (`CAM_UP/DOWN/LEFT/RIGHT`), then single-char keys (`0–9`, `A–D`). Uses `BEQ.W` (forced 32-bit branch encoding) to prevent assembler out-of-range errors. Stores the matched `KEY_x` constant into `g_bt_ui_key_request`.
+
+```assembly
+BT_Handle_UIKey
+        PUSH    {R4-R7, LR}
+        ; Check CAM_UP first (multi-char, must precede single-char "U" check)
+        LDR     R0, =bt_rx_buffer
+        LDR     R1, =BT_TEXT_KEY_UP
+        BL      BT_Contains
+        CMP     R0, #1
+        BEQ.W   BTUI_Up
+        ; ... repeat for DOWN, LEFT, RIGHT, then 0-9, A-D
+BTUI_Up
+        MOVS    R4, #KEY_UP
+        B       BTUI_Store
+        ; ... other labels
+BTUI_Store
+        LDR     R5, =g_bt_ui_key_request
+        STR     R4, [R5]
+BTUI_Exit
+        POP     {R4-R7, PC}
+        ALIGN
+        LTORG
+```
+
+#### 3. `main.s` — Key Injection into the Super Loop
+
+```assembly
+; Import the shared variable:
+IMPORT  g_bt_ui_key_request
+
+; Updated Main_Loop (add after BT_RxTask):
+Main_Loop
+        BL      BT_RxTask                       ; Pull Bluetooth bytes
+        BL      Main_ProcessBTKeyInjection       ; ← Inject virtual keypad presses
+        BL      Main_ProcessBluetoothCmd         ; Act on motion commands
+        BL      Main_CheckIRInput                ; IR remote
+        ; ... rest unchanged
+
+; Injection subroutine (place below Main_BackgroundTasks):
+Main_ProcessBTKeyInjection
+        PUSH    {R4-R6, LR}
+        LDR     R4, =g_bt_ui_key_request
+        LDR     R5, [R4]
+        CMP     R5, #0
+        BEQ     MPBK_Exit                ; No pending key — skip
+        LDR     R6, =g_keycode
+        STR     R5, [R6]                 ; Inject into g_keycode (same as IR remote)
+        MOVS    R5, #0
+        STR     R5, [R4]                 ; Clear the request
+MPBK_Exit
+        POP     {R4-R6, PC}
+```
+
+> **Design note:** Writing into `g_keycode` means the virtual keypad press flows through exactly the same `UI_Handle_Input` dispatch path as a physical IR remote press — no duplicate state-machine logic required anywhere.
 
 ---
 
 ## 📷 Visual Walkthrough & Simulation
 
-### Assembled Bedside Station IR Call Hardware Simulation
-![IR Station Bedside Call Simulation](imgs/ir_station_sim.png)
+> *(Add Proteus simulation screenshots, hardware photos, and waveform captures here)*
 
 ---
 
