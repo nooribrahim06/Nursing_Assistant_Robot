@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- ── Header Card ────────────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="20dp"
+            android:layout_marginBottom="12dp">
+
+            <!-- Top row: icon + title -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_heartbeat"
+                    android:layout_marginEnd="12dp"
+                    android:contentDescription="RoboCare"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="RoboCare"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-medium"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvPatientName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Patient: --"
+                android:textSize="17sp"
+                android:textColor="@color/purple_200"
+                android:layout_marginTop="12dp"
+                android:fontFamily="sans-serif-medium"/>
+
+            <TextView
+                android:id="@+id/tvPatientId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ID: --"
+                android:textSize="13sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="2dp"/>
+
+            <!-- Connection status row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical">
+
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@drawable/bg_status_dot"
+                    android:layout_marginEnd="8dp"/>
+
+                <TextView
+                    android:id="@+id/tvConnectionStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="DISCONNECTED"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.06"
+                    android:textColor="@color/status_disconnected"/>
+
+                <TextView
+                    android:id="@+id/tvLastUpdated"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--:--:--"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_hint"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Medicine Alert Banner (Hidden by default) ─────────── -->
+        <LinearLayout
+            android:id="@+id/llMedicineAlert"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_alert_medicine"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_notification"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="Alert"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Medicine Alert"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvMedicineAlertText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Loading..."
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:layout_marginTop="8dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDismissMedAlert"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Dismiss"
+                android:textSize="14sp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#CC0000"
+                app:icon="@drawable/ic_check_circle"
+                app:iconTint="#CC0000"
+                app:cornerRadius="12dp"/>
+        </LinearLayout>
+
+        <!-- ── Smoke Alert Banner (Hidden by default) ──────────── -->
+        <LinearLayout
+            android:id="@+id/llSmokeAlert"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_alert_smoke"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_smoke"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="Smoke alert"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Smoke Alert"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvSmokeAlertText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Smoke level dangerous\nEvacuate / check environment"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:layout_marginTop="8dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDismissSmokeAlert"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Dismiss"
+                android:textSize="14sp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#CC3300"
+                app:icon="@drawable/ic_check_circle"
+                app:iconTint="#CC3300"
+                app:cornerRadius="12dp"/>
+        </LinearLayout>
+
+        <!-- ── Health Overview Card ──────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="20dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_health"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="Health"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="HEALTH OVERVIEW"
+                    style="@style/RoboCare.Text.SectionTitle"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvHealthStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No Data"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="10dp"/>
+
+            <TextView
+                android:id="@+id/tvHealthReason"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Waiting for vitals"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="4dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Rule-based monitoring aid, not a medical diagnosis."
+                android:textSize="10sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="10dp"
+                android:textStyle="italic"/>
+        </LinearLayout>
+
+        <!-- ── Vitals Row 1: BPM + SpO2 ─────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <!-- BPM -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginEnd="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_heart_bpm"
+                    android:contentDescription="BPM"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BPM"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_bpm"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvBpm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="36sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+
+            <!-- SpO2 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginStart="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_lungs"
+                    android:contentDescription="SpO2"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SpO₂"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_spo2"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvSpo2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="36sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Vitals Row 2: Breath + Smoke ──────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <!-- Breath -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginEnd="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_air"
+                    android:contentDescription="Breath"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BREATH"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_breath"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvBreath"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="36sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+
+            <!-- Smoke -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginStart="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_smoke"
+                    android:contentDescription="Smoke"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SMOKE"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_smoke"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvSmoke"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+                <TextView
+                    android:id="@+id/tvSmokeRaw"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Raw: --"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_hint"
+                    android:layout_marginTop="2dp"
+                    android:visibility="visible"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Vitals Row 3: MED + Alert ─────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <!-- MED -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginEnd="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_medication"
+                    android:contentDescription="Medication"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MED"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_med"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvMed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="36sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+
+            <!-- Alert -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="20dp"
+                android:layout_marginStart="4dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_warning"
+                    android:contentDescription="Alert"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ALERT"
+                    android:textSize="12sp"
+                    android:textColor="@color/vital_alert"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:layout_marginTop="4dp"/>
+                <TextView
+                    android:id="@+id/tvAlert"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="NONE"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Raw Packet ────────────────────────────────────────── -->
+        <TextView
+            android:id="@+id/tvRawPacket"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Raw: waiting for data..."
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:textColor="@color/text_hint"
+            android:background="@drawable/bg_card_light_rounded"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- ── Save Button ───────────────────────────────────────── -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Save Reading"
+            android:textSize="15sp"
+            android:layout_marginBottom="10dp"
+            app:icon="@drawable/ic_save"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:cornerRadius="14dp"/>
+
+        <!-- ── Nav Row 1 ─────────────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistory"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="History"
+                android:textSize="13sp"
+                android:layout_marginEnd="4dp"
+                app:icon="@drawable/ic_history"
+                app:iconSize="18dp"
+                app:iconPadding="6dp"
+                style="@style/RoboCare.Button.Outlined"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMedicines"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Medicines"
+                android:textSize="13sp"
+                android:layout_marginStart="4dp"
+                app:icon="@drawable/ic_medication"
+                app:iconSize="18dp"
+                app:iconPadding="6dp"
+                app:iconTint="@color/purple_200"
+                style="@style/RoboCare.Button.Outlined"/>
+        </LinearLayout>
+
+        <!-- ── Nav Row 2 ─────────────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBluetooth"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Bluetooth"
+                android:textSize="13sp"
+                android:layout_marginEnd="4dp"
+                app:icon="@drawable/ic_bluetooth"
+                app:iconSize="18dp"
+                app:iconPadding="6dp"
+                style="@style/RoboCare.Button.Outlined"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBackPatients"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Patients"
+                android:textSize="13sp"
+                android:layout_marginStart="4dp"
+                app:icon="@drawable/ic_patients"
+                app:iconSize="18dp"
+                app:iconPadding="6dp"
+                style="@style/RoboCare.Button.Outlined"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
