@@ -205,10 +205,10 @@ MOT_DefaultFlow
         ORR     R7, R4, R5
         ORR     R7, R7, R6
 		
-	MOV     R0, #Black_High ; Note: If Sensor Outputs Low when detecting a black line change to Black_Low
+	MOV     R0, #ACTIVE_SENSOR_STATE 
 	CMP     R0 , #1
 	BEQ     Decision_Maker
-        EOR     R7, R7, #7 
+    EOR     R7, R7, #7 
 	B       Decision_Maker		
 ; -------------------------------------------------------------
 ; Decision Tree
