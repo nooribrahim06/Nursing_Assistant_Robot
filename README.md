@@ -22,7 +22,7 @@
 
 ## 🎬 Demo Video
 
-> **▶ [Watch Robo in Action — Full Demo on YouTube](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)**
+> **▶ [Watch Robo in Action — Full Demo on YouTube](https://youtu.be/xYX7A6s5tPI)**
 >
 > *(Replace the link above with the actual YouTube video URL once uploaded)*
 
