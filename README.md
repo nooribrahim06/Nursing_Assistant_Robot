@@ -956,7 +956,7 @@ Below is the implementation matrix for the robot's active features, detailing bo
   - Performs an **8-sample moving average filter** on the raw ADC value to eliminate high-frequency ripple.
   - On startup, records a baseline value over the **first 128 samples** to calibrate individual skin reflectance.
   - Calculates the relative sub-dermal absorption:
-    $$\text{Absorption} = \text{Baseline} - \text{Averaged\Readings}$$
+    $$\text{Absorption} = \text{Baseline} - \text{Averaged Readings}$$
 - **Audio Modulation (`Drivers/buzzer.s`)**: Maps the absorption level to a dynamic beep interval. When absorption is high (indicative of a sub-dermal blood vessel absorbing IR light), the beep interval decreases down to a solid tone to guide needle insertion.
 - **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Graphs the absorption intensity as a live horizontal scrolling wave.
 
