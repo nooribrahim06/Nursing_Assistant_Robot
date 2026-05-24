@@ -1030,14 +1030,15 @@ The robot's `PB13` IR receiver module sees the single active beacon. `StationIR_
 
 | Station | Button Address (C B A) | Active Decoder Output | IR Beacon |
 |---------|------------------------|----------------------|-----------|
-| Station 1 | `0 0 1` | Y1 | LED 1 ON |
-| Station 2 | `0 1 0` | Y2 | LED 2 ON |
-| Station 3 | `0 1 1` | Y3 | LED 3 ON |
-| Station 4 | `1 0 0` | Y4 | LED 4 ON |
-| Station 5 | `1 0 1` | Y5 | LED 5 ON |
-| Station 6 | `1 1 0` | Y6 | LED 6 ON |
-| Station 7 | `1 1 1` | Y7 | LED 7 ON |
-| None / Reset | `0 0 0` | Y0 (unused) | All LEDs OFF |
+| Station 1 | `0 0 1` | Y1 | LED S1  	   ON |
+| Station 2 | `0 1 0` | Y2 | LED S2  	   ON |
+| Station 3 | `0 1 1` | Y3 | LED DUPLICATE ON |
+| Station 4 | `1 0 0` | Y4 | LED S3        ON |
+| Station 5 | `1 0 1` | Y5 | LED DUPLICATE ON |
+| Station 6 | `1 1 0` | Y6 | LED DUPLICATE ON |
+| Station 7 | `1 1 1` | Y7 | LED DUPLICATE ON |
+| Stand by  | `0 0 0` | Y0 | LED STANDBY   ON | 
+
 
 #### Proteus Simulation
 
