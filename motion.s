@@ -204,10 +204,16 @@ MOT_DefaultFlow
         ; 4. Combine sensor mask
         ORR     R7, R4, R5
         ORR     R7, R7, R6
-        EOR     R7, R7, #7             ; Note: Assuming your line tracker already outputs Low if it detects the black line then you will simply use an ORR instruction
+		
+	MOV     R0, #Black_High ; Note: If Sensor Outputs Low when detecting a black line change to Black_Low
+	CMP     R0 , #1
+	BEQ     Decision_Maker
+        EOR     R7, R7, #7 
+	B       Decision_Maker		
 ; -------------------------------------------------------------
 ; Decision Tree
 ; -------------------------------------------------------------
+Decision_Maker
         CMP     R7, #0x02               ; Center only (010)
         BEQ     Action_Straight
 
