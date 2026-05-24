@@ -1,26 +1,14 @@
 ; =====================================================================
 ; FILE: motion.s
 ; DESCRIPTION:
-;   Default motion flow + temporary PHONE override for Bluetooth app
-;
-; DEFAULT:
-;   Runs the existing line-tracker motion exactly like before.
-;
-; PHONE OVERRIDE:
-;   Bluetooth parser will call exported MOT_SetPhone... functions.
-;   While g_motion_state = MOTION_PHONE, MOT_Update ignores sensors
-;   and executes the latest phone direction.
-;
-; IMPORTANT:
-;   - No new UI state is required.
-;   - MODE=LINE from app means return to DEFAULT normal flow.
-;   - Direction commands are ignored unless PHONE override is active.
+; Default (Line-Tracking): Uses 3 line tracking sensors to follow a marked path.
+; Phone Override: Activating this via Bluetooth bypasses the sensors to allow manual control of the robot's direction.
 ; =====================================================================
 
         AREA    MOTION_DATA, DATA, READWRITE
         ALIGN
 
-Last_Turn               DCD     0       ; 0=Straight, 1=Left, 2=Right
+Last_Turn               DCD     0       ; 0=Straight, 1=Left, 2=Right ;Variables to save the Last state before losing the line for Line Saver
 
         AREA    MOTION_CODE, CODE, READONLY
         THUMB
@@ -75,9 +63,9 @@ Last_Turn               DCD     0       ; 0=Straight, 1=Left, 2=Right
 
 
 
-; =====================================================================
+; ---------------------------------------------------------------------
 ; MOT_Init
-; =====================================================================
+; ---------------------------------------------------------------------
 MOT_Init
         PUSH    {R0-R2, LR}
 
@@ -111,6 +99,7 @@ MOT_Init
         ; LEFT   -> PB12
         ; CENTER -> PB15
         ; RIGHT  -> PB14
+        
         LDR     R0, =GPIOB_BASE
         MOV     R1, #LINE_LEFT
         BL      GPIO_ConfigInput
@@ -137,14 +126,8 @@ MOT_Init
 
 ; =====================================================================
 ; MOT_Update
-;
-; Called repeatedly from main loop.
-;
-; If PHONE override is active:
-;   execute latest phone direction.
-;
-; Else:
-;   run original/default line tracker flow.
+; If phone override is active: execute latest phone direction.
+; Otherwise: run the line tracker logic.
 ; =====================================================================
 MOT_Update
         PUSH    {R3-R7, LR}
@@ -169,7 +152,7 @@ MOT_CheckMode
         LDR     R0, [R0]
         CMP     R0, #15
         BHS     MOT_CheckStation
-        BL      MOT_StopNow         ; CRITICAL: Stop in ANY mode if obstacle detected
+        BL      MOT_StopNow         ; Stop in any mode if an obstacle is detected
         B       MOT_Update_Exit
 
         ; ---- IR STATION CHECK ----
@@ -196,10 +179,9 @@ MOT_RunPhoneTask
         B       MOT_Update_Exit
 
 
-; =====================================================================
-; DEFAULT FLOW
-; This is the old/current line-tracker logic kept as-is.
-; =====================================================================
+; -------------------------------------------------------------
+; Line Tracker Logic (Default)
+; -------------------------------------------------------------
 MOT_DefaultFlow
         ; 1. LEFT SENSOR
         LDR     R0, =GPIOB_BASE
@@ -222,10 +204,10 @@ MOT_DefaultFlow
         ; 4. Combine sensor mask
         ORR     R7, R4, R5
         ORR     R7, R7, R6
-        EOR     R7, R7, #7              ;Note: Assuming your line tracker already outputs Low if it detects the black line then you will simply use an ORR instruction
-        ; -------------------------------------------------------------
-        ; Existing decision tree
-        ; -------------------------------------------------------------
+        EOR     R7, R7, #7             ; Note: Assuming your line tracker already outputs Low if it detects the black line then you will simply use an ORR instruction
+; -------------------------------------------------------------
+; Decision Tree
+; -------------------------------------------------------------
         CMP     R7, #0x02               ; Center only (010)
         BEQ     Action_Straight
 
@@ -346,11 +328,10 @@ MOT_Update_Exit
 ; =====================================================================
 ; MOT_StopNow
 ; Stops both motors immediately.
-; Clears direction pins and sets PWM to zero.
 ; =====================================================================
 MOT_StopNow
 Motion_Stop
-        PUSH    {R3, LR}                ; PUSH R3 to maintain 8-byte stack alignment
+        PUSH    {R3, LR}                
 
         LDR     R0, =GPIOA_BASE
         MOV     R1, #MOT_IN1
@@ -374,12 +355,8 @@ Motion_Stop
 
         POP     {R3, PC}
 
-
-
-
-
 ; =====================================================================
-; Direction Helpers
+; DIRECTION SETTERS
 ; =====================================================================
 
 ; ---------------------------------------------------------------------
@@ -387,7 +364,7 @@ Motion_Stop
 ; ---------------------------------------------------------------------
 Set_Dir_Forward
 Motion_Forward
-        PUSH    {R3, LR}                ; PUSH R3 to maintain 8-byte stack alignment
+        PUSH    {R3, LR}               
 
         LDR     R0, =GPIOA_BASE
         MOV     R1, #MOT_IN1
@@ -413,7 +390,7 @@ Motion_Forward
 ; ---------------------------------------------------------------------
 Set_Dir_Backward
 Motion_Backward
-        PUSH    {R3, LR}                ; PUSH R3 to maintain 8-byte stack alignment
+        PUSH    {R3, LR}                
 
         LDR     R0, =GPIOA_BASE
         MOV     R1, #MOT_IN1
@@ -440,7 +417,7 @@ Motion_Backward
 ; ---------------------------------------------------------------------
 Set_Dir_Spin_Left
 Motion_Left
-        PUSH    {R3, LR}                ; PUSH R3 to maintain 8-byte stack alignment
+        PUSH    {R3, LR}                
 
         LDR     R0, =GPIOA_BASE
         MOV     R1, #MOT_IN1
@@ -467,7 +444,7 @@ Motion_Left
 ; ---------------------------------------------------------------------
 Set_Dir_Spin_Right
 Motion_Right
-        PUSH    {R3, LR}                ; PUSH R3 to maintain 8-byte stack alignment
+        PUSH    {R3, LR}                
 
         LDR     R0, =GPIOA_BASE
         MOV     R1, #MOT_IN1
@@ -489,5 +466,5 @@ Motion_Right
 
 
         ALIGN
-        END ; END
+        END 
         
