@@ -145,6 +145,7 @@ LINE_RIGHT          EQU     14
 STATION_IR_PIN      EQU     13
 Black_High          EQU     1
 Black_Low           EQU     0	
+; Note: Change depending on the sensor type you are using	
 ACTIVE_SENSOR_STATE EQU     Black_High
 ;-----------------------------------------------------------------------------
 ; Alarm flags
