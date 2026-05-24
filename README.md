@@ -1000,13 +1000,14 @@ If two patients press their call buttons simultaneously, two IR beacons would em
 #### How It Works — Step by Step
 
 **Step 1 — Patient presses a latch button.**
-Each bedside has a latching push-button. When pressed, it stores the call request mechanically (stays pressed until reset). The button outputs connect to the `A`, `B`, `C` select lines of the 74HC238 decoder, encoding which station is calling as a 3-bit binary number (Station 1 = `001`, Station 2 = `010`, Station 3 = `011`, etc.).
+Each bedside has a latching push-button. When pressed, it stores the call request mechanically (stays pressed until reset). The button outputs connect to the `A`, `B`, `C` select lines of the 74HC238 decoder, encoding which station is calling as a 3-bit binary number (Station 1 = `001`, Station 2 = `010`, Station 3 = `100`, etc.).
 
 **Step 2 — The 74HC238 decoder activates exactly one output.**
-The decoder reads the 3-bit address on its select lines and pulls exactly one of its eight outputs (`Y0`–`Y7`) HIGH. All other outputs remain LOW. This is the core hardware guarantee — the decoder's combinational logic makes it physically impossible for two outputs to be HIGH simultaneously for the same select combination.
+The decoder reads the 3-bit address on its select lines and pulls exactly one of its eight outputs (Y0–Y7) HIGH. All other outputs remain LOW. This is the core hardware guarantee — the decoder's combinational logic makes it physically impossible for two outputs to be HIGH simultaneously for the same select combination. Additionally, when more than 1 button is pushed, a corresponding LED right beside the nurse will light up simultaneously, instantly alerting her that the robot is needed at that exact time. 
+
 
 **Step 3 — Diode isolation routes power to one IR transmitter.**
-Each decoder output (`Y0`–`Y7`) connects to one IR LED transmitter through a series diode. The diodes serve two purposes:
+Each decoder output (`Y0`,`Y1`,`Y2`,`Y4`) connects to one IR LED transmitter the rest (`Y3`,`Y5`,`Y6`,`Y7`) to regular LED through a series diode. The diodes serve two purposes:
 - **Forward direction**: current flows from the active decoder output through the diode to power the IR LED.
 - **Reverse direction**: the diode blocks any back-current from flowing from one output into another, preventing cross-triggering where an active LED on Y1 could inadvertently feed current back into Y2's circuit.
 
@@ -1015,6 +1016,7 @@ Only the one IR LED connected to the active decoder output has a complete curren
 
 **Step 5 — The robot detects and docks.**
 The robot's `PB13` IR receiver module sees the single active beacon. `StationIR_Update` debounces the signal over 5 samples and sets `g_station_detected = 1`. The `motion.s` guidance loop calls `MOT_StopNow`, halting the robot precisely at that bedside station.
+
 
 #### Why This Design Was Chosen
 
