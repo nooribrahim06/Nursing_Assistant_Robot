@@ -12,7 +12,7 @@ Android companion app for a robotic patient-monitoring system built around an ST
 RoboCare Monitor receives live vitals from a healthcare robot over Bluetooth, stores patient data in Firebase, and gives caregivers a single mobile interface for monitoring, alerts, patient records, medicine tracking, robot motion control, and TFT display control.
 
 <p align="center">
-  <img src="assets/testing.jpg" alt="RoboCare running on a phone beside the robot" width="35%">
+  <img src="assets/hero-preview.jpg" alt="RoboCare running on a phone beside the robot" width="35%">
 </p>
 
 ## Features
