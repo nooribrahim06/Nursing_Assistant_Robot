@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base dark palette -->
+    <color name="bg_dark">#FF1A1A2E</color>
+    <color name="bg_card">#FF16213E</color>
+    <color name="bg_card_light">#FF1C2A4A</color>
+    <color name="bg_input">#FF0F3460</color>
+    <color name="bg_surface">#FF202040</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#CCFFFFFF</color>
+    <color name="text_hint">#88FFFFFF</color>
+
+    <!-- Accent -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6C63FF</color>
+    <color name="purple_700">#FF5A52D5</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="accent">#FFFF6B6B</color>
+
+    <!-- Gradient endpoints -->
+    <color name="gradient_start">#FF6C63FF</color>
+    <color name="gradient_end">#FFBB86FC</color>
+
+    <!-- Dividers & separators -->
+    <color name="divider">#1AFFFFFF</color>
+
+    <!-- Status -->
+    <color name="status_connected">#FF4CAF50</color>
+    <color name="status_connecting">#FFFFEB3B</color>
+    <color name="status_disconnected">#FFFF5252</color>
+
+    <!-- Vitals card accents -->
+    <color name="vital_bpm">#FFFF6B6B</color>
+    <color name="vital_spo2">#FF4ECDC4</color>
+    <color name="vital_breath">#FF45B7D1</color>
+    <color name="vital_smoke">#FFFF9F43</color>
+    <color name="vital_med">#FFA29BFE</color>
+    <color name="vital_alert">#FFFF6B6B</color>
+
+    <!-- Vitals card subtle backgrounds (10% opacity tints) -->
+    <color name="vital_bpm_bg">#1AFF6B6B</color>
+    <color name="vital_spo2_bg">#1A4ECDC4</color>
+    <color name="vital_breath_bg">#1A45B7D1</color>
+    <color name="vital_smoke_bg">#1AFF9F43</color>
+    <color name="vital_med_bg">#1AA29BFE</color>
+    <color name="vital_alert_bg">#1AFF6B6B</color>
+
+    <!-- Standard -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#FF6C63FF</color>
+    <color name="primary_dark">#FF5A52D5</color>
+</resources>

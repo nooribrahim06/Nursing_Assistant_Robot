@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Top half of pill -->
+    <path
+        android:fillColor="@color/vital_med"
+        android:pathData="M18.36,5.64c-1.95,-1.95 -5.12,-1.95 -7.07,0L8.46,8.46l7.07,7.07l2.83,-2.83C20.31,10.76 20.31,7.59 18.36,5.64z" />
+    <!-- Bottom half of pill -->
+    <path
+        android:fillColor="@color/vital_med"
+        android:fillAlpha="0.6"
+        android:pathData="M5.64,18.36c1.95,1.95 5.12,1.95 7.07,0l2.83,-2.83L8.46,8.46l-2.83,2.83C3.69,13.24 3.69,16.41 5.64,18.36z" />
+</vector>

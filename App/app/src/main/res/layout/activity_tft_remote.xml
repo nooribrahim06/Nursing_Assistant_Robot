@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="20dp">
+
+        <!-- ── Header ─────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_remote"
+                android:layout_marginEnd="10dp"
+                android:contentDescription="TFT Remote" />
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TFT Remote"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+
+        <!-- ── Bluetooth status pill ──────────────────── -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:id="@+id/statusDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/bg_status_dot"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tvConnectionStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DISCONNECTED"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:textColor="@color/status_disconnected" />
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- ══ PANEL: MAIN MODES (default visible) ══════ -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/panelMain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ROBOT MODES"
+                style="@style/RoboCare.Text.SectionTitle"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Row 1: Sanitizing | Heart Rate -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode1"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="1\nSanitizing"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/teal_200"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode2"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="2\nHeart Rate"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/vital_bpm"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
+            <!-- Row 2: Breathing | Medicine -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode3"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="3\nBreathing"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/vital_breath"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode4"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="4\nMedicine"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/vital_med"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
+            <!-- Row 3: Temperature | Vision -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode5"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="5\nTemperature"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/vital_smoke"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMode0"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="0\nMore Menu"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
+            <!-- Quick Actions -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="QUICK ACTIONS"
+                style="@style/RoboCare.Text.SectionTitle"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMotionControl"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="Motion Control"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp"
+                app:icon="@drawable/ic_gamepad"
+                app:iconSize="18dp"
+                app:iconGravity="textStart"
+                app:backgroundTint="@color/bg_card_light"
+                android:textColor="@color/text_primary"
+                app:cornerRadius="14dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedOff"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="Med Alert OFF"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/vital_med"
+                    android:textColor="@color/white"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSmokeOff"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="Smoke Alert OFF"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/status_disconnected"
+                    android:textColor="@color/white"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnExitD"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="D  Exit / Dismiss"
+                android:textSize="13sp"
+                app:backgroundTint="@color/bg_card"
+                android:textColor="@color/status_disconnected"
+                app:cornerRadius="14dp" />
+
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- ══ PANEL: MORE MENU (hidden default) ═══════ -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/panelMore"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="MORE MENU"
+                style="@style/RoboCare.Text.SectionTitle"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Row 1: Vision | Vein Finder -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMore6"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="6\nVision"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMore7"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="7\nVein Finder"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
+            <!-- Row 2: Stress Test | Empty/Filler -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMore8"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1"
+                    android:text="8\nStress Test"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMoreC"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="C  Back to Main"
+                android:textSize="13sp"
+                app:backgroundTint="@color/bg_card"
+                android:textColor="@color/status_connected"
+                app:cornerRadius="14dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMoreD"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="D  Exit View (Vein/Stress)"
+                android:textSize="13sp"
+                app:backgroundTint="@color/bg_card"
+                android:textColor="@color/status_disconnected"
+                app:cornerRadius="14dp" />
+
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- ══ PANEL: MEDICINE INPUT (hidden default) ═══ -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/panelMedicine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="MEDICINE INPUT"
+                style="@style/RoboCare.Text.SectionTitle"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Row 1-2-3 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey1"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="1"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey2"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="2"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey3"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="3"
+                    android:textSize="22sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <!-- Row 4-5-6 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey4"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="4"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey5"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="5"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey6"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="6"
+                    android:textSize="22sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <!-- Row 7-8-9 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey7"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="7"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey8"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="8"
+                    android:textSize="22sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey9"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="9"
+                    android:textSize="22sp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <!-- Row 0 centered -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="12dp">
+
+                <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedKey0"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:text="0"
+                    android:textSize="22sp"
+                    android:layout_marginHorizontal="3dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="14dp" />
+
+                <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- A OK / B Clear -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedA"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="A  OK / Confirm"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/status_connected"
+                    android:textColor="@color/white"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMedB"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="B  Clear"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/vital_smoke"
+                    android:textColor="@color/white"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <!-- C Back (sends CMD + returns to main) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMedC"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="C  Back / Cancel"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"
+                app:backgroundTint="@color/bg_card_light"
+                android:textColor="@color/purple_200"
+                app:cornerRadius="14dp" />
+
+            <!-- Back to modes (UI only, no command) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMedBackToModes"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:text="← Back to Modes"
+                android:textSize="12sp"
+                style="@style/RoboCare.Button.Outlined"
+                app:cornerRadius="14dp" />
+
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- ══ PANEL: VISION CONTROL (hidden default) ═══ -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/panelVision"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="VISION CONTROL"
+                style="@style/RoboCare.Text.SectionTitle"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Navigate the robot camera view"
+                android:textSize="10sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="16dp" />
+
+            <!-- D-pad: Up -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVisUp"
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:text="▲\nUp"
+                android:textSize="18sp"
+                android:layout_marginBottom="8dp"
+                app:backgroundTint="@color/bg_card"
+                android:textColor="@color/purple_200"
+                app:cornerRadius="16dp" />
+
+            <!-- D-pad: Left / OK / Right -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnVisLeft"
+                    android:layout_width="90dp"
+                    android:layout_height="90dp"
+                    android:text="◄\nLeft"
+                    android:textSize="18sp"
+                    android:layout_marginEnd="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnVisOk"
+                    android:layout_width="90dp"
+                    android:layout_height="90dp"
+                    android:text="OK"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/status_connected"
+                    android:textColor="@color/white"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnVisRight"
+                    android:layout_width="90dp"
+                    android:layout_height="90dp"
+                    android:text="►\nRight"
+                    android:textSize="18sp"
+                    android:layout_marginStart="8dp"
+                    app:backgroundTint="@color/bg_card"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
+            <!-- D-pad: Down -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVisDown"
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:text="▼\nDown"
+                android:textSize="18sp"
+                android:layout_marginBottom="16dp"
+                app:backgroundTint="@color/bg_card"
+                android:textColor="@color/purple_200"
+                app:cornerRadius="16dp" />
+
+            <!-- C Back / D Exit -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnVisBack"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="C  Back"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="6dp"
+                    app:backgroundTint="@color/bg_card_light"
+                    android:textColor="@color/purple_200"
+                    app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnVisExit"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="D  Exit"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/status_disconnected"
+                    android:textColor="@color/white"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+
+            <!-- Back to modes (UI only) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVisBackToModes"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:text="← Back to Modes"
+                android:textSize="12sp"
+                style="@style/RoboCare.Button.Outlined"
+                app:cornerRadius="14dp" />
+
+        </LinearLayout>
+
+        <!-- ── Last command log (always visible) ──────── -->
+        <TextView
+            android:id="@+id/tvLastCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Last command: none"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:textColor="@color/text_hint"
+            android:background="@drawable/bg_card_light_rounded"
+            android:padding="12dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Commands are forwarded to STM32 TFT UI"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp" />
+
+    </LinearLayout>
+</ScrollView>

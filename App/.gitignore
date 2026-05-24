@@ -1,0 +1,77 @@
+# =========================
+# GRADLE
+# =========================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# =========================
+# ANDROID STUDIO / IDE
+# =========================
+.idea/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+.vscode/
+*.code-workspace
+
+# =========================
+# LOCAL CONFIGURATION
+# =========================
+local.properties
+
+# =========================
+# FIREBASE (contains API keys)
+# =========================
+app/google-services.json
+
+# =========================
+# BUILD OUTPUTS
+# =========================
+app/build/
+app/release/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# =========================
+# LOG / TEMP FILES
+# =========================
+*.log
+latest_log.txt
+*.tmp
+*.bak
+*.swp
+
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# =========================
+# SIGNING
+# =========================
+*.jks
+*.keystore
+signing.properties
+
+# =========================
+# PROGUARD
+# =========================
+app/proguard-rules.pro.bak
+
+# =========================
+# MISC
+# =========================
+captures/
+.externalNativeBuild/
+.cxx/
+output.json
