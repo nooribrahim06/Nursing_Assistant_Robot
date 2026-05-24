@@ -843,127 +843,182 @@ Below is the implementation matrix for the robot's active features, detailing bo
 ### 1. Heart Rate & SpO₂ Monitor (MAX30102)
 
 *   **Metaphor (ELIF5)**: When your heart beats, blood rushes through your finger and absorbs light. The oximeter sensor shines red and infrared lights into your skin to count how fast your pulse is going and see how clean your blood oxygen is!
-*   **File Collaboration**:
-    *   `Drivers/i2c.s`: Handles registers using bit-banged start, stop, and repeated reads.
-    *   `features/max.s`: Reads data from the MAX30102 FIFO registers, implements a DC estimator filter, and calculates SpO₂ and BPM values.
-    *   `core/main.s`: Calls `HR_ReadFIFO` inside the state dispatcher loop.
-    *   `core/ui_state.s` & `Drivers/tft_gfx.s`: Processes numeric vitals to display and graph results.
+*   **Detailed Collaboration & Implementation**:
+    *   **I2C Layer (`Drivers/i2c.s`)**: Handles hardware register communication over open-drain pins `PB8` (SCL) and `PB9` (SDA) with a standard 100 kHz transmission clock. It manages I2C transaction protocols: generating start, write-address (`0x57` device LSB=0), sub-register write, read-address (LSB=1), repeated start, ACK, NACK, and STOP conditions.
+    *   **Configuration & Filtering (`features/max.s`)**:
+        *   Initializes the MAX30102 by writing `MODE_RESET = 0x40` to register `0x09` (`REG_MODE_CFG`), disabling interrupts, clearing FIFO pointers, configuring SpO₂ mode, and setting both LED currents to `1Fh` (approx. 6.4mA).
+        *   Polls the FIFO pointers (`REG_FIFO_WR_PTR = 0x04` and `REG_FIFO_RD_PTR = 0x06`) to check for new samples. If a sample exists, it executes a 6-byte burst read of `REG_FIFO_DATA = 0x07` to retrieve raw Red and Infrared channel readings.
+        *   Implements an infinite impulse response (IIR) **DC Removal Filter** to isolate the AC heart signal for screen plotting:
+            $$\text{DC}(n) = \text{DC}(n-1) + \frac{\text{Raw}(n) - \text{DC}(n-1)}{16}$$
+            $$\text{AC}(n) = \text{Raw}(n) - \text{DC}(n)$$
+            The AC signal is offset by $+2000$ to maintain positive values and stored in `g_hr_ac_val` for real-time scrolling wave drawing on the TFT.
+        *   Implements finger detection: if the raw IR value falls below `40,000` counts, it flags "No Finger" and zeroes the outputs.
+        *   Calculates BPM and SpO₂: BPM is mapped to a diagnostic range of $70 \text{ to } 101 \text{ bpm}$ based on the Red raw values. SpO₂ is calculated by taking the ratio of Red and Infrared AC/DC components:
+            $$\text{Ratio} = \frac{\text{Red}_{\text{AC}} / \text{Red}_{\text{DC}}}{\text{IR}_{\text{AC}} / \text{IR}_{\text{DC}}}$$
+            This ratio is scaled and clamped to output a value between $70\% \text{ and } 100\%$ to `g_spo2` in RAM.
+    *   **Scheduler (`core/main.s`)**: Invokes `HR_ReadFIFO` inside the super-loop execution cycle.
+    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders numeric BPM and SpO₂ digits, and draws real-time scrolling raw PPG waves on the TFT.
 
 ---
 
 ### 2. Breathing Waveform Monitor
 
 *   **Metaphor (ELIF5)**: Think of this as drawing a wave line on a chalkboard that tracks your breathing. To prevent the line from drifting off the board, a helper calculates the average room temperature (baseline) and automatically centers the drawing line.
-*   **File Collaboration**:
-    *   `Drivers/adc.s`: Samples analog thermistors on `PA0` (ADC Channel 0).
-    *   `features/breathing.s`: Tracks dynamic baselines over 64-reading cycles, amplifies variations ($\times 8$), and centers coordinates around `2048`.
-    *   `core/main.s`: Triggers `BREATHE_Update` in the super-loop.
-    *   `core/ui_state.s` & `Drivers/tft_gfx.s`: Limits updates of the wave plotting graph to a stable $40\text{Hz}$ (25ms) refresh rate.
+*   **Detailed Collaboration & Implementation**:
+    *   **ADC Driver (`Drivers/adc.s`)**: Samples the analog thermistor/respiratory flow sensor connected to `PA0` (ADC Channel 0) at a resolution of 12 bits ($0 \text{ to } 4095$ range).
+    *   **Signal Processing (`features/breathing.s`)**:
+        *   Restricts update tasks to a stable $40\text{ Hz}$ ($25\text{ms}$ refresh cycle) by comparing the uptime ticks in `g_ms_ticks`.
+        *   On startup, initializes baseline and filter registers with the first raw sensor sample.
+        *   Implements a slow baseline tracking filter to eliminate temperature drift:
+            $$\text{Baseline}(n) = \text{Baseline}(n-1) + \frac{\text{Raw}(n) - \text{Baseline}(n-1)}{64}$$
+        *   Calculates the centered AC breathing level by subtracting the baseline from the raw reading and amplifying the variance by 8:
+            $$\text{AC}_{\text{unfiltered}} = (\text{Raw}(n) - \text{Baseline}(n)) \times 8$$
+            This value is clamped within $[-1024, +1024]$ to prevent overflow.
+        *   Smoothes out high-frequency noise using a low-pass filter:
+            $$\text{Filtered}(n) = \text{Filtered}(n-1) + \frac{\text{AC}_{\text{unfiltered}}(n) - \text{Filtered}(n-1)}{4}$$
+        *   Shifts the smoothed AC signal to center around a baseline offset of `2048` and stores the final result in `g_breath_level` in RAM.
+    *   **Scheduler (`core/main.s`)**: Executes `BREATHE_Update` repeatedly in the scheduler.
+    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Draws the scrolling waveform of `g_breath_level` relative to the screen height.
 
 ---
 
 ### 3. Volatility Stress Index
 
 *   **Metaphor (ELIF5)**: When you are calm, your heart beats steadily. When you are excited or stressed, your heart rate increases. This script calculates how high your heart rate is compared to resting, and adds micro-movements on the screen to show live feedback.
-*   **File Collaboration**:
-    *   `features/max.s` & `core/global.s`: Generates heart-rate data (`g_bpm`).
-    *   `features/stress.s`: Computes stress levels by scaling values over resting rates `(BPM - 60) * 2`.
-    *   `core/main.s`: Calls `Stress_Update` continuously while in stress mode.
-    *   `core/ui_state.s`: References `g_ms_ticks` to inject a $0\text{--}3\%$ variation mask, keeping graph lines dynamically animated.
+*   **Detailed Collaboration & Implementation**:
+    *   **Data Source (`features/max.s`)**: Obtains live heart rate values from `g_bpm`.
+    *   **Stress Analysis (`features/stress.s`)**:
+        *   Calculates stress index using the mathematical relationship:
+            $$\text{Stress Score} = (\text{BPM} - 60) \times 2$$
+        *   If the calculated score is negative (BPM is below 60), it defaults to 0.
+        *   Limits the maximum stress score to `100` to prevent chart overflows.
+    *   **Jitter Injection (`core/ui_state.s`)**: Reads the millisecond counter `g_ms_ticks` to inject a $0\text{--}3\%$ variation mask (`g_ms_ticks & 3`) to the displayed volatility score, simulating real-life sensor jitter and keeping the TFT interface visually dynamic.
+    *   **Visual Interface (`Drivers/tft_gfx.s`)**: Renders the stress level as an animated bar gauge alongside warning tags.
 
 ---
 
 ### 4. Sub-Dermal Vein Finder
 
 *   **Metaphor (ELIF5)**: Veins look like dark underground rivers under our skin. The robot shines an invisible flashlight (infrared) down. If it finds a river (vein), it absorbs the light, making the robot beep faster the closer it gets to the center.
-*   **File Collaboration**:
-    *   `Drivers/adc.s`: Configures `PA7` for analog mode, assigning an extended **480 clock cycle** sampling time to stabilize light sensors.
-    *   `features/vein.s`: Integrates 8-sample averages to eliminate noise, calibrates a baseline using the first 128 readings, and calculates absorption differences.
-    *   `core/main.s`: Executes `VEIN_Update` at regular intervals.
-    *   `Drivers/buzzer.s`: Directs the buzzer on `PB4` to beep at frequencies matching sub-dermal density measurements ($200\text{ms}$ up to solid tones).
+*   **Detailed Collaboration & Implementation**:
+    *   **ADC Driver (`Drivers/adc.s`)**: Configures `PA7` (ADC Channel 7) for analog sensing. It writes to the `ADC_SMPR2` register to apply an extended **480 clock cycle** sampling time, stabilizing reading acquisitions and filtering out high-impedance optical noise.
+    *   **Signal Processing (`features/vein.s`)**:
+        *   Performs an 8-sample moving average filter on the raw ADC value to eliminate high-frequency ripple.
+        *   On startup, records a baseline value over the first 128 samples to calibrate individual skin reflectance.
+        *   Calculates the relative sub-dermal absorption:
+            $$\text{Absorption} = \text{Baseline} - \text{Averaged\_Readings}$$
+    *   **Audio Modulation (`Drivers/buzzer.s`)**:
+        *   Maps the absorption level to a dynamic beep interval. 
+        *   When absorption is high (indicative of a sub-dermal blood vessel absorbing IR light), the beep interval decreases down to a solid tone to guide needle insertion.
+    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Graphs the absorption intensity as a live horizontal scrolling wave.
 
 ---
 
 ### 5. Body Temperature Monitor
 
 *   **Metaphor (ELIF5)**: This is a digital thermometer that reads your body temperature and splits it into a whole number (like 37) and a fraction (like .5) to show on the screen.
-*   **File Collaboration**:
-    *   `Drivers/i2c.s`: Directs register read transactions to sensor memory space `0x1F` and `0x20`.
-    *   `features/max.s`: Triggers one-shot temperature conversions in register `0x21` and handles hardware timeouts.
-    *   `core/main.s`: Schedules temperature conversion tasks every $500\text{ms}$.
-    *   `core/ui_state.s` & `Drivers/tft_gfx.s`: Formats and displays the calculated parameters as decimals on the LCD screen.
+*   **Detailed Collaboration & Implementation**:
+    *   **I2C Layer (`Drivers/i2c.s`)**: Performs reads and writes on the MAX30102 temperature registers.
+    *   **Acquisition (`features/max.s`)**:
+        *   Initiates a temperature conversion by writing `0x01` to `REG_TEMP_CONFIG = 0x21`.
+        *   Spins in a watchdog-guarded timeout loop (40,000 counts) checking for the conversion bit to clear.
+        *   Reads the signed integer byte from `REG_TEMP_INTR = 0x1F` and stores it to `g_temp_int`.
+        *   Reads the fractional part (4-bit resolution, each step representing $0.0625^{\circ}\text{C}$) from `REG_TEMP_FRAC = 0x20`, masking with `0x0F` and storing the decimal coefficient to `g_temp_frac`.
+    *   **Scheduler (`core/main.s`)**: Triggers `HR_ReadTemp` conversions every $500\text{ms}$.
+    *   **Visual Interface (`core/ui_state.s` & `Drivers/tft_gfx.s`)**: Renders decimal readouts on the display.
 
 ---
 
 ### 6. Servo Medication Dispenser
 
 *   **Metaphor (ELIF5)**: The robot acts like a smart pillbox. You set a timer, and when it runs out, the robot rings a bell (buzzer) and turns a wheel (servo) to drop a pill into your hand!
-*   **File Collaboration**:
-    *   `core/ui_state.s`: Reads keypad inputs to set countdown times (stored in `g_med_timer`).
-    *   `features/medicine.s`: Compares millisecond ticks `g_ms_ticks` to handle background timers and flags medication alerts (`Med_Alert_Flag`).
-    *   `Drivers/pwm.s`: Configures `TIM3` on `PA6` for 50Hz PWM output, adjusting pulse widths ($500\text{--}2500\text{ }\mu\text{s}$) to sweep the dispensing servo $0^{\circ} \to 90^{\circ} \to 180^{\circ} \to 0^{\circ}$.
-    *   `Drivers/buzzer.s` & `core/main.s`: Directs the buzzer on `PB4` to sound alerts and handles user confirmation inputs.
+*   **Detailed Collaboration & Implementation**:
+    *   **State Machine (`core/ui_state.s`)**: Captures keypad inputs to decrement or increment medication wait times, stored in `g_med_timer`.
+    *   **Background Timer (`features/medicine.s`)**: Compares current SysTick values against `g_ms_ticks` to handle background seconds countdown. When `g_med_timer` reaches 0, it triggers a global alarm flag `Med_Alert_Flag` in `g_alarm_flags`.
+    *   **PWM Driver (`Drivers/pwm.s`)**:
+        *   Configures `TIM3` on `PA6` for 50Hz PWM output (prescaler 15, ARR 19999).
+        *   Adjusts duty cycle pulse widths via `TIM3_CCR1`:
+            *   `500 µs` ($0.5\text{ms}$ / $2.5\%$ duty) -> $0^{\circ}$ (holding position).
+            *   `1500 µs` ($1.5\text{ms}$ / $7.5\%$ duty) -> $90^{\circ}$ (medication dropped).
+            *   `2500 µs` ($2.5\text{ms}$ / $12.5\%$ duty) -> $180^{\circ}$ (sweep complete).
+    *   **Buzzer & Alarm Control (`Drivers/buzzer.s` & `core/main.s`)**: Sound alerts and wait for user confirmation inputs before returning the servo to the holding position.
 
 ---
 
 ### 7. Environmental Smoke Alert
 
 *   **Metaphor (ELIF5)**: If the robot smells smoke, it counts to 15 to make sure it's not just a false alarm (like a blown candle), then sounds a fire alarm and switches the screen to a warning display.
-*   **File Collaboration**:
-    *   `Drivers/adc.s`: Sets up ADC1 Analog Watchdog limits on channel 1 (MQ-2) to trigger high-priority interrupts (`ADC_IRQHandler`) when readings exceed `3000`.
-    *   `features/smoke.s`: Handles startup warm-ups (150 readings) and counts consecutive high samples (15 readings over 3 seconds) to prevent false alerts.
-    *   `core/main.s` & `core/ui_state.s`: Renders full-screen fire alarms and handles user snooze commands.
-    *   `Drivers/buzzer.s`: Drives periodic beeps on `PB4` until the sensor reading drops below `2000`.
+*   **Detailed Collaboration & Implementation**:
+    *   **ADC Driver (`Drivers/adc.s`)**: Configures `PA1` (ADC Channel 1) for the MQ-2 sensor. Configures the hardware **Analog Watchdog (AWD)** to trigger the high-priority `ADC_IRQHandler` (IRQ 18) when readings exceed the upper threshold (`HTR = 3000`).
+    *   **Sensor Warmup & Verification (`features/smoke.s`)**:
+        *   Implements a 30-second startup delay (150 readings) to allow the MQ-2 heating element to stabilize before checking alarm flags.
+        *   Implements a debounce filter requiring **15 consecutive samples** above threshold over 3 seconds to prevent false alarms.
+    *   **Audio Modulation (`Drivers/buzzer.s`)**: Drives continuous alert beeps on `PB4` until smoke concentration drops below `2000`.
+    *   **Visual Interface (`core/ui_state.s`)**: Sets `Smoke_Alert_Flag` in `g_alarm_flags`, overriding the active screen to render a red flashing "SMOKE ALERT - DANGER" warning.
 
 ---
 
 ### 8. IR Hand Sanitizer
 
 *   **Metaphor (ELIF5)**: When you place your hand under the sensor, it blocks a light beam. The robot detects this and turns on a pump to dispense sanitizer, then turns it off.
-*   **File Collaboration**:
-    *   `core/main.s`: Initializes sanitizer ports and runs update tasks in the background.
-    *   `features/santizing.s`: Polls the active-low proximity sensor on `PA4`. When triggered, it turns on the relay pump output on `PA5` and runs a software delay loop before turning it off.
+*   **Detailed Collaboration & Implementation**:
+    *   **State Machine (`features/santizing.s`)**:
+        *   Polls the active-low proximity sensor connected to `PA4` using `GPIO_ReadPin`.
+        *   If a hand is detected (`PA4 == 0`), it pulls the relay pump output `PA5` **HIGH** to start the gel pump.
+        *   Runs a software delay loop to keep the pump active for exactly 1.5 seconds.
+        *   Pulls `PA5` **LOW** to stop the pump, preventing gel leakage.
+        *   Enforces a mandatory 2-second cooldown delay before another dose can be dispensed.
 
 ---
 
 ### 9. Landolt C Vision Test
 
 *   **Metaphor (ELIF5)**: The robot displays a circle with a small gap on the screen (like a letter "C"). You press arrow buttons on the remote to point to where the gap is. If you get it right, the circle gets smaller and smaller!
-*   **File Collaboration**:
-    *   `Drivers/ir_driver.s`: Decodes directional remote commands (`KEY_UP`/`KEY_DOWN`/`KEY_LEFT`/`KEY_RIGHT`) via `PB10` falling-edge interrupts.
-    *   `core/ui_state.s`: Compares remote button inputs to randomized optotype gap positions, calculates correct scores, and adjusts Landolt C chart sizes.
-    *   `Drivers/tft_gfx.s`: Renders the high-contrast Landolt C rings onto coordinates on the LCD.
+*   **Detailed Collaboration & Implementation**:
+    *   **IR Receiver (`Drivers/ir_driver.s`)**: Decodes directional remote keys (`KEY_UP`/`KEY_DOWN`/`KEY_LEFT`/`KEY_RIGHT`) via falling-edge interrupts on `PB10`.
+    *   **Test Management (`core/ui_state.s`)**:
+        *   Generates a randomized gap orientation (Up, Down, Left, or Right) using the lowest bits of `g_ms_ticks`.
+        *   Decreases the size of the Landolt C ring by reducing the drawing radius on successive correct answers.
+        *   Tracks test scores and calculates the corresponding Snellen visual acuity fraction (ranging from `< 6/60` up to `6/6`).
+    *   **Graphics Engine (`Drivers/tft_gfx.s`)**: Renders the high-contrast Landolt C optotypes on the LCD.
 
 ---
 
 ### 10. Autonomous Line-Tracking Guidance
 
 *   **Metaphor (ELIF5)**: The robot acts like a toy train on a track. It uses three light sensors underneath to watch the floor. If it drifts too far left or right, it adjusts its wheels to stay on the line. If it loses the line entirely, it remembers where it last saw it and turns back!
-*   **File Collaboration**:
-    *   `core/gpio.s`: Configures `PB12` (Left), `PB15` (Center), and `PB14` (Right) as digital inputs.
-    *   `motion.s`: Reads tracking inputs, processes turn memory states (`Last_Turn`), and stops if the ultrasonic sensor registers an obstacle within $15\text{ cm}$.
-    *   `Drivers/pwm.s`: Directs `TIM4` registers to output correct PWM speeds to the DC motors.
+*   **Detailed Collaboration & Implementation**:
+    *   **Sensor Reading (`core/gpio.s`)**: Configures `PB12` (Left), `PB15` (Center), and `PB14` (Right) as digital inputs.
+    *   **Guidance Control (`motion.s`)**:
+        *   Polls sensor inputs, combines them into a 3-bit mask, and inverts it (`EOR R7, R7, #7`) to correct for active-low outputs.
+        *   Uses a decision tree to adjust steering: center sensors on line drive straight; side sensors trigger arc turns.
+        *   **Memory Rescue Logic:** Tracks the steering history using `Last_Turn`. If the line is lost (`000` mask), it executes a hard tank spin in the direction it last saw the line.
+    *   **Safety Overrides (`features/ultrasonic.s`)**: Reads obstacle distance from the HC-SR04 sonar. If an obstacle is detected within $15\text{ cm}$, it overrides all mode tasks to stop the motors.
+    *   **DC Motor Control (`Drivers/pwm.s`)**: Drives `TIM4` registers to output PWM duty cycles (prescaler 15, ARR 999) to control wheel velocity.
 
 ---
 
 ### 11. Mobile App Bluetooth Override
 
 *   **Metaphor (ELIF5)**: Usually, the robot drives itself. But if you connect your phone over Bluetooth, you can drive it like a remote-controlled car! If you close the app, the robot safely stops and goes back to tracking the line.
-*   **File Collaboration**:
-    *   `Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`: Buffers serial streams via USART2 interrupts and maps them to directional variables.
-    *   `features/motion_bt.s`: Captures mobile remote flags (joystick steps) and triggers a 2-second timeout stopwatch if communications are lost.
-    *   `motion.s`: Bypasses autonomous line tracking and hands control over to Bluetooth command inputs when manual mode is active.
+*   **Detailed Collaboration & Implementation**:
+    *   **Serial Buffer (`Drivers/bluetooth.s` & `Drivers/bluetooth_buffer.s`)**: Sets up USART2 on `PA2`/`PA3` to receive joystick inputs. Fills a circular ring buffer in the background using RXNE interrupts.
+    *   **Command Parsing (`features/motion_bt.s`)**:
+        *   Searches the buffer for motion commands (`FWD`, `BACK`, `LEFT`, `RIGHT`, `STOP`).
+        *   Sets manual override flags and resets a 2-second timeout watchdog on each new packet.
+    *   **Override Logic (`motion.s`)**: If the manual flag is set, it bypasses autonomous line tracking to execute Bluetooth steering commands. If the 2-second timeout expires, it halts the robot and returns to autonomous line-tracking mode.
 
 ---
 
 ### 12. Bedside IR Station Call-Docking Feature
 
 *   **Metaphor (ELIF5)**: Imagine the robot is a mail carrier. When a patient clicks a calling button at their bedside, it turns on an invisible beacon (Infrared light). The robot is drawn to this light, navigates to the bedside, and stops to deliver medication.
-*   **File Collaboration**:
-    *   `core/constants.s` & `core/gpio.s`: Configures pin `PB13` (`STATION_IR_PIN`) as a digital input.
-    *   `features/ir_stations.s`: Monitors sensor inputs on `PB13`. It inverts the active-low signal and runs a 5-cycle debounce filter to set `g_station_detected`.
-    *   `core/main.s`: Calls `StationIR_Update` on every super-loop cycle.
-    *   `motion.s`: Checks the status of `g_station_detected`. If active (alignment beacon detected), the guidance loop calls `MOT_StopNow` to halt the DC motors, docking the robot at the patient's bedside.
+*   **Detailed Collaboration & Implementation**:
+    *   **Input Pin (`core/gpio.s`)**: Configures `PB13` (`STATION_IR_PIN`) as a digital input.
+    *   **Debounced Reading (`features/ir_stations.s`)**:
+        *   Polls `PB13` and inverts the active-low signal (`EOR R0, R0, #1`).
+        *   Implements a 5-cycle consecutive read debounce filter. If 5 consecutive readings differ from the current state, it updates `g_station_detected`.
+    *   **Chassis Halt (`motion.s`)**: Checks the status of `g_station_detected`. If active (alignment beacon detected), the guidance loop calls `MOT_StopNow` to halt the DC motors, docking the robot at the patient's bedside.
 
 ---
 
